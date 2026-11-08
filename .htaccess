@@ -1,0 +1,21 @@
+# CREDICOCHA'S — protección para Apache (Render Docker / cPanel / VPS con Apache)
+Options -Indexes
+DirectoryIndex index.html
+
+# Nadie puede descargar .env, .sql, manuales, Dockerfile ni configuraciones desde el navegador
+<FilesMatch "(^\.|Dockerfile|render\.yaml|firebase\.json|\.(sql|txt|md|log|example|bak|yml|yaml)$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+</IfModule>

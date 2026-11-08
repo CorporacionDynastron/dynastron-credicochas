@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: credicochas-api
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: APP_TIMEZONE
+        value: America/Lima
+      - key: APP_DEBUG
+        value: "false"
+      - key: MORA_FEE
+        value: "10"
+      - key: SESSION_HOURS
+        value: "12"
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASS_INICIAL
+        sync: false

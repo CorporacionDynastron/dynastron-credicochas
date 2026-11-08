@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env
+.firebaserc
+firebase.json
+.firebase
+README_INSTRUCCIONES.txt
+*.bak
+*.log

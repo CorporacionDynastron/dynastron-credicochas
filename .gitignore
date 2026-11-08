@@ -1,0 +1,14 @@
+# Credenciales y entorno (NUNCA subir a GitHub)
+.env
+.env.*
+!.env.example
+
+# Firebase cache
+.firebase/
+firebase-debug.log*
+
+# Respaldos y temporales
+*.bak
+*.log
+*Respaldo*.json
+*Audit_Log*.json
