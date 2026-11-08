@@ -160,20 +160,18 @@ function db(): PDO
         throw new DbConnectionError('Faltan credenciales de base de datos (configure DATABASE_URL o DB_HOST, DB_NAME, DB_USER y DB_PASS).');
     }
 
+    $pdoOpts = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+        PDO::ATTR_TIMEOUT            => 10,
+    ];
+
     if ($driver === 'pgsql') {
         if (!extension_loaded('pdo_pgsql')) {
             throw new DbConnectionError('La extensión PHP pdo_pgsql no está habilitada en el servidor.');
         }
         $dsn = "pgsql:host={$host};port={$port};dbname={$name};sslmode={$sslmode}";
-        // Compatibilidad automática con SNI de Neon Serverless Postgres (extrae ep-xxx sin -pooler)
-        $endpoint = env('NEON_ENDPOINT_ID', '');
-        if ($endpoint === '' && strpos($host, '.neon.tech') !== false) {
-            $firstLabel = explode('.', $host)[0];
-            $endpoint   = (string) preg_replace('/-pooler$/i', '', $firstLabel);
-        }
-        if ($endpoint !== '') {
-            $dsn .= ";options='endpoint={$endpoint}'";
-        }
     } else {
         if (!extension_loaded('pdo_mysql')) {
             throw new DbConnectionError('La extensión PHP pdo_mysql no está habilitada en el servidor.');
@@ -183,15 +181,22 @@ function db(): PDO
     }
 
     try {
-        $pdo = new PDO($dsn, $user, $pass, [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-            PDO::ATTR_TIMEOUT            => 10,
-        ]);
+        $pdo = new PDO($dsn, $user, $pass, $pdoOpts);
     } catch (PDOException $e) {
-        error_log('[credicochas] No se pudo conectar a la BD (' . $driver . '): ' . $e->getMessage());
-        throw new DbConnectionError('No se pudo conectar a la base de datos.');
+        // Fallback para clientes libpq antiguos (ej. Windows sin SNI) que piden explícitamente endpoint=...
+        if ($driver === 'pgsql' && strpos($e->getMessage(), 'Endpoint ID is not specified') !== false) {
+            $firstLabel = explode('.', $host)[0];
+            $endpoint   = (string) preg_replace('/-pooler$/i', '', $firstLabel);
+            try {
+                $pdo = new PDO($dsn . ";options='endpoint={$endpoint}'", $user, $pass, $pdoOpts);
+            } catch (PDOException $e2) {
+                error_log('[credicochas] No se pudo conectar a la BD (pgsql fallback): ' . $e2->getMessage());
+                throw new DbConnectionError('No se pudo conectar a la base de datos.');
+            }
+        } else {
+            error_log('[credicochas] No se pudo conectar a la BD (' . $driver . '): ' . $e->getMessage());
+            throw new DbConnectionError('No se pudo conectar a la base de datos.');
+        }
     }
 
     $offset = (new DateTimeImmutable('now', $tz))->format('P');
