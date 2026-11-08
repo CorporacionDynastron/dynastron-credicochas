@@ -72,7 +72,7 @@ function send_security_and_cors_headers(): void
             header('Access-Control-Allow-Origin: ' . $allowOrigin);
             header('Access-Control-Allow-Credentials: true');
             header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Token, X-CSRF-Token');
             header('Access-Control-Max-Age: 86400');
             header('Vary: Origin');
         }
@@ -257,6 +257,10 @@ function set_token_cookie(string $rawToken, int $exp): void
 
 function get_incoming_token(): string
 {
+    $headerToken = trim((string) ($_SERVER['HTTP_X_SESSION_TOKEN'] ?? ''));
+    if (preg_match('/^[a-f0-9]{64}$/i', $headerToken)) {
+        return strtolower($headerToken);
+    }
     $authHeader = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
     if (preg_match('/^Bearer\s+([a-f0-9]{64})$/i', trim($authHeader), $m)) {
         return strtolower($m[1]);
@@ -1007,7 +1011,6 @@ send_security_and_cors_headers();
 
 try {
     $pdo = db();
-    ensure_schema($pdo);
     $action = isset($_GET['action']) ? (string) $_GET['action'] : '';
 
     switch ($action) {
@@ -1060,7 +1063,10 @@ try {
         respond(['ok' => false, 'error' => (string) ($e->errorInfo[2] ?? $e->getMessage())], 409);
     }
     if ($sqlstate === '42S02' || $sqlstate === '42P01') {
-        respond(['ok' => false, 'error' => 'La base de datos no tiene las tablas. Importe database_postgres.sql (Neon) o database.sql (MySQL).'], 500);
+        try {
+            ensure_schema(db());
+        } catch (Throwable $ignore) {}
+        respond(['ok' => false, 'error' => 'Tablas inicializadas automáticamente. Por favor intente la acción de nuevo.'], 503);
     }
     if ($sqlstate === '23505' || ($sqlstate === '23000' && $driver === 1062)) {
         respond(['ok' => false, 'error' => 'Registro duplicado.'], 409);

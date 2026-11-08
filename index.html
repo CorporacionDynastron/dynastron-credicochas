@@ -1090,7 +1090,10 @@
         async function api(action, data) {
             const isPost = data !== undefined;
             const headers = {};
-            if (sessionToken) headers['Authorization'] = 'Bearer ' + sessionToken;
+            if (sessionToken) {
+                headers['Authorization'] = 'Bearer ' + sessionToken;
+                headers['X-Session-Token'] = sessionToken;
+            }
             if (isPost) {
                 headers['Content-Type'] = 'application/json';
                 headers['X-CSRF-Token'] = csrfToken;

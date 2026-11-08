@@ -1,6 +1,7 @@
 # CREDICOCHA'S — protección para Apache (Render Docker / cPanel / VPS con Apache)
 Options -Indexes
 DirectoryIndex index.html
+CGIPassAuth On
 
 # Nadie puede descargar .env, .sql, manuales, Dockerfile ni configuraciones desde el navegador
 <FilesMatch "(^\.|Dockerfile|render\.yaml|firebase\.json|\.(sql|txt|md|log|example|bak|yml|yaml)$)">

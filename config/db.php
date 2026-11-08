@@ -163,7 +163,9 @@ function db(): PDO
     $pdoOpts = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
+        // En PostgreSQL (Neon Pooler / PgBouncer transaction mode), ATTR_EMULATE_PREPARES=true
+        // usa PQescapeLiteral nativo de libpq evitando colisiones de prepared statements en el pooler.
+        PDO::ATTR_EMULATE_PREPARES   => ($driver === 'pgsql'),
         PDO::ATTR_TIMEOUT            => 10,
     ];
 
