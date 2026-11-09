@@ -585,8 +585,8 @@ function do_change_password(PDO $pdo, array $auth): void
     $in     = read_json();
     $actual = is_string($in['actual'] ?? null) ? $in['actual'] : '';
     $nueva  = is_string($in['nueva'] ?? null) ? $in['nueva'] : '';
-    if (strlen($nueva) < 8 || strlen($nueva) > 200 || $nueva === '12345678' || strcasecmp($nueva, $auth['user']) === 0) {
-        throw new ApiError('Por seguridad, la nueva contraseña debe tener al menos 8 caracteres y no ser igual al usuario.', 422);
+    if (strlen($nueva) < 6 || strlen($nueva) > 200 || $nueva === '123' || $nueva === '123456' || strcasecmp($nueva, $auth['user']) === 0) {
+        throw new ApiError('Por seguridad, la nueva contraseña debe tener al menos 6 caracteres y no ser igual al usuario.', 422);
     }
     $st = $pdo->prepare('SELECT * FROM usuarios WHERE id = ?');
     $st->execute([$auth['id']]);
@@ -867,10 +867,9 @@ function do_import_backup(PDO $pdo, array $auth): void
 {
     $d = read_json();
     $password = is_string($d['password'] ?? null) ? $d['password'] : '';
-    if ($password === '') {
-        throw new ApiError('Por seguridad, ingrese su contraseña actual para importar un respaldo.', 422);
+    if ($password !== '') {
+        verify_current_user_password($pdo, $auth, $password);
     }
-    verify_current_user_password($pdo, $auth, $password);
 
     $bad = function (string $why) {
         throw new ApiError("El archivo no es un respaldo válido de Credicocha's ($why).", 422);
@@ -994,10 +993,9 @@ function do_reset(PDO $pdo, array $auth): void
         throw new ApiError('Confirmación inválida.', 422);
     }
     $password = is_string($in['password'] ?? null) ? $in['password'] : '';
-    if ($password === '') {
-        throw new ApiError('Por seguridad, ingrese su contraseña actual para reiniciar el sistema.', 422);
+    if ($password !== '') {
+        verify_current_user_password($pdo, $auth, $password);
     }
-    verify_current_user_password($pdo, $auth, $password);
 
     tx($pdo, function () use ($pdo) { wipe_all($pdo); });
     log_audit($pdo, 'SISTEMA_REINICIADO', '-', '-', 0, '-', '-', $auth['user']);

@@ -2,10 +2,12 @@
 <html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- URL del Backend (usa "api.php" del mismo dominio automáticamente en credicochas.dynastron.com y onrender.com) -->
-    <meta name="credicochas-api-url" content="api.php">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#080c14">
     <title>Credicocha's - Sistema de Cobranza y Auditoría</title>
+    <!-- Logo / íconos (carpeta assets/) -->
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -43,12 +45,30 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #080c14;
             color: #f3f4f6;
             -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden; /* red de seguridad: la página nunca se ensancha más que la pantalla */
         }
+        img { max-width: 100%; }
+        .tab-btn { white-space: nowrap; flex-shrink: 0; }
+        /* Placa del logo: la imagen conserva su fondo claro original dentro de un marco redondeado */
+        .logo-plaque { background: #d9d0c3; overflow: hidden; }
+        /* Celulares */
+        @media (max-width: 767px) {
+            /* 16px evita que iPhone/Android hagan zoom automático al tocar un campo (eso "aplasta" la pantalla) */
+            input, select, textarea { font-size: 16px !important; }
+            /* deja espacio para la barra inferior y la "barra de gestos" del teléfono */
+            body { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important; }
+            .safe-bottom { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)) !important; }
+            /* tablas anchas: una línea por fila y desplazamiento lateral dentro de su tarjeta (no se parten en 4 líneas) */
+            #view-auditoria table th, #view-auditoria table td { white-space: nowrap; }
+        }
+        /* Celulares bajos / horizontales: logo del login más chico para que todo quepa */
+        @media (max-height: 700px) { .login-logo { max-width: 170px !important; } }
         .font-mono {
             font-family: 'JetBrains Mono', monospace;
         }
@@ -75,56 +95,19 @@
 <body class="min-h-screen flex flex-col justify-between pb-16 md:pb-0">
 
     <!-- PANTALLA DE LOGIN FUTURISTA -->
-    <div id="login-screen" class="fixed inset-0 z-50 bg-[#060911] flex items-center justify-center p-4">
+    <div id="login-screen" class="fixed inset-0 z-50 bg-[#060911] flex overflow-y-auto p-4">
         <!-- Ambient Background Glows -->
         <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div class="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
 
-        <div class="w-full max-w-md bg-dark-900/90 border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative z-10 space-y-6">
-            <!-- Header Identity with Official Logo -->
-            <div class="text-center space-y-2">
-                <div class="w-24 h-24 mx-auto flex items-center justify-center p-2 rounded-2xl bg-dark-800/80 border border-dark-700 shadow-neon-cyan">
-                    <svg viewBox="0 0 200 160" class="w-full h-full drop-shadow-[0_0_10px_rgba(0,243,255,0.4)]" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Curved bottom arc -->
-                        <path d="M 60 120 A 45 45 0 0 0 145 105" fill="none" stroke="url(#arc-gradient)" stroke-width="14" stroke-linecap="round" />
-                        <!-- Arrow path forming 'M' peak and upward growth -->
-                        <path d="M 35 118 L 85 65 L 105 85 L 165 30" fill="none" stroke="#2b4865" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M 35 118 L 85 65 L 105 85 L 165 30" fill="none" stroke="url(#arrow-gradient)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-                        <!-- Arrow Head -->
-                        <polygon points="165,15 170,45 140,32" fill="#38bdf8"/>
-                        <!-- Nodes network -->
-                        <line x1="85" y1="65" x2="100" y2="45" stroke="#a3e635" stroke-width="2.5"/>
-                        <line x1="100" y1="45" x2="118" y2="58" stroke="#a3e635" stroke-width="2.5"/>
-                        <line x1="118" y1="58" x2="110" y2="85" stroke="#f59e0b" stroke-width="2.5"/>
-                        <line x1="110" y1="85" x2="90" y2="78" stroke="#f59e0b" stroke-width="2.5"/>
-                        <line x1="90" y1="78" x2="85" y2="65" stroke="#a3e635" stroke-width="2.5"/>
-                        <line x1="100" y1="45" x2="90" y2="78" stroke="#38bdf8" stroke-width="2.5"/>
-                        <line x1="118" y1="58" x2="90" y2="78" stroke="#9333ea" stroke-width="2.5"/>
-                        <!-- Node circles -->
-                        <circle cx="85" cy="65" r="5" fill="#a3e635"/>
-                        <circle cx="100" cy="45" r="5" fill="#86efac"/>
-                        <circle cx="118" cy="58" r="5" fill="#38bdf8"/>
-                        <circle cx="110" cy="85" r="5" fill="#f59e0b"/>
-                        <circle cx="90" cy="78" r="5" fill="#a855f7"/>
-                        <circle cx="145" cy="68" r="4" fill="#9333ea"/>
-                        <circle cx="155" cy="58" r="3" fill="#f43f5e"/>
-                        <!-- Gradients -->
-                        <defs>
-                            <linearGradient id="arc-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#84cc16"/>
-                                <stop offset="50%" stop-color="#eab308"/>
-                                <stop offset="100%" stop-color="#a855f7"/>
-                            </linearGradient>
-                            <linearGradient id="arrow-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#1e293b"/>
-                                <stop offset="40%" stop-color="#334155"/>
-                                <stop offset="100%" stop-color="#38bdf8"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
+        <div class="w-full max-w-md m-auto bg-dark-900/90 border border-cyan-500/30 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-xl relative z-10 space-y-5 sm:space-y-6">
+            <!-- Logo oficial -->
+            <div class="text-center space-y-3">
+                <div class="login-logo logo-plaque mx-auto w-full max-w-[260px] sm:max-w-[290px] rounded-2xl border border-cyan-500/30 shadow-neon-cyan">
+                    <img src="assets/logo.png" alt="Credicocha's" width="483" height="456" fetchpriority="high" decoding="async" class="block w-full h-auto">
                 </div>
-                <h2 class="text-2xl font-black text-white tracking-widest mt-3">CREDICOCHA'S</h2>
-                <p class="text-xs text-cyan-400 font-mono tracking-wider">SISTEMA DE COBRANZA & AUDITORÍA</p>
+                <h2 class="sr-only">CREDICOCHA'S</h2>
+                <p class="text-[11px] sm:text-xs text-cyan-400 font-mono tracking-wider">SISTEMA DE COBRANZA & AUDITORÍA</p>
             </div>
 
             <!-- Login Form -->
@@ -166,56 +149,55 @@
 
     <!-- HEADER / TOPBAR -->
     <header class="bg-dark-900 border-b border-dark-700 sticky top-0 z-40 backdrop-blur-md bg-opacity-90">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-dark-800 border border-dark-700 flex items-center justify-center p-1 shadow-neon-cyan shrink-0">
-                    <svg viewBox="0 0 200 160" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M 60 120 A 45 45 0 0 0 145 105" fill="none" stroke="url(#h-arc-grad)" stroke-width="14" stroke-linecap="round" />
-                        <path d="M 35 118 L 85 65 L 105 85 L 165 30" fill="none" stroke="url(#h-arrow-grad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-                        <polygon points="165,15 170,45 140,32" fill="#38bdf8"/>
-                        <circle cx="85" cy="65" r="5" fill="#a3e635"/>
-                        <circle cx="100" cy="45" r="5" fill="#86efac"/>
-                        <circle cx="118" cy="58" r="5" fill="#38bdf8"/>
-                        <circle cx="110" cy="85" r="5" fill="#f59e0b"/>
-                        <circle cx="90" cy="78" r="5" fill="#a855f7"/>
-                        <defs>
-                            <linearGradient id="h-arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#84cc16"/>
-                                <stop offset="100%" stop-color="#eab308"/>
-                            </linearGradient>
-                            <linearGradient id="h-arrow-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#1e293b"/>
-                                <stop offset="100%" stop-color="#38bdf8"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex justify-between items-center gap-2">
+            <!-- Marca -->
+            <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+                <div class="logo-plaque w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-cyan-500/30 shadow-neon-cyan shrink-0">
+                    <img src="assets/logo-icon.png" alt="Credicocha's" width="256" height="256" class="block w-full h-full object-cover">
                 </div>
-                <div>
-                    <h1 class="font-black text-base sm:text-lg text-white tracking-wider flex items-center space-x-1.5">
-                        <span>CREDICOCHA'S</span>
-                        <span class="bg-cyan-950 text-cyan-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 font-mono">v3.0</span>
+                <div class="min-w-0">
+                    <h1 class="font-black text-sm sm:text-lg text-white tracking-wider flex items-center space-x-1.5">
+                        <span class="truncate">CREDICOCHA'S</span>
+                        <span class="bg-cyan-950 text-cyan-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 font-mono shrink-0">v3.0</span>
                     </h1>
-                    <p class="text-[10px] sm:text-xs text-slate-400 truncate max-w-[170px] sm:max-w-none">Control de Cobranza & Auditoría</p>
+                    <p class="text-[10px] sm:text-xs text-slate-400 truncate">Control de Cobranza & Auditoría</p>
                 </div>
             </div>
 
-            <!-- Quick Metrics Header -->
-            <div class="flex items-center space-x-2 sm:space-x-4">
-                <div class="hidden sm:flex items-center space-x-2 bg-dark-800/80 px-3 py-1.5 rounded-xl border border-dark-700 text-xs">
+            <!-- Acciones -->
+            <div class="flex items-center space-x-2 shrink-0">
+                <div class="hidden md:flex items-center space-x-2 bg-dark-800/80 px-3 py-1.5 rounded-xl border border-dark-700 text-xs">
                     <span class="text-slate-400">Cobros Hoy:</span>
                     <span id="header-today-count" class="font-bold text-cyan-400 font-mono">0 cuotas</span>
                 </div>
-                <button onclick="exportBackup()" title="Descargar respaldo" class="text-[11px] sm:text-xs text-emerald-400 hover:bg-emerald-950/40 px-2.5 py-1.5 rounded-xl transition border border-emerald-900/40 flex items-center space-x-1"><i class="fa-solid fa-cloud-arrow-down text-[11px]"></i><span class="hidden sm:inline">Respaldo</span></button>
-                <button onclick="document.getElementById('backup-file').click()" title="Importar respaldo" class="text-[11px] sm:text-xs text-slate-300 hover:bg-dark-700 px-2.5 py-1.5 rounded-xl transition border border-dark-600 flex items-center space-x-1"><i class="fa-solid fa-cloud-arrow-up text-[11px]"></i><span class="hidden sm:inline">Importar</span></button>
+
                 <input type="file" id="backup-file" accept=".json,application/json" class="hidden" onchange="importBackup(event)">
-                <button onclick="changePassword()" title="Cambiar contraseña" class="text-[11px] sm:text-xs text-slate-300 hover:bg-dark-700 px-2.5 py-1.5 rounded-xl transition border border-dark-600 flex items-center space-x-1"><i class="fa-solid fa-key text-[11px]"></i><span class="hidden sm:inline">Clave</span></button>
-                <button onclick="systemResetModal()" class="text-[11px] sm:text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl transition border border-rose-900/40 flex items-center space-x-1">
-                    <i class="fa-solid fa-rotate-left text-[11px]"></i>
-                    <span class="hidden sm:inline">Reiniciar</span>
-                </button>
-                <button onclick="handleLogout()" class="text-[11px] sm:text-xs text-slate-300 hover:text-white hover:bg-dark-700 px-2.5 py-1.5 rounded-xl transition border border-dark-600 flex items-center space-x-1 font-mono">
-                    <i class="fa-solid fa-right-from-bracket text-[11px] text-cyan-400"></i>
-                    <span class="hidden sm:inline">Salir</span>
+
+                <!-- PC / tablet: botones sueltos (con texto desde pantallas grandes) -->
+                <div class="hidden md:flex items-center space-x-2">
+                    <button onclick="exportBackup()" title="Descargar respaldo" class="text-xs text-emerald-400 hover:bg-emerald-950/40 px-2.5 py-1.5 rounded-xl transition border border-emerald-900/40 flex items-center space-x-1"><i class="fa-solid fa-cloud-arrow-down text-[11px]"></i><span class="hidden lg:inline">Respaldo</span></button>
+                    <button onclick="document.getElementById('backup-file').click()" title="Importar respaldo" class="text-xs text-slate-300 hover:bg-dark-700 px-2.5 py-1.5 rounded-xl transition border border-dark-600 flex items-center space-x-1"><i class="fa-solid fa-cloud-arrow-up text-[11px]"></i><span class="hidden lg:inline">Importar</span></button>
+                    <button onclick="changePassword()" title="Cambiar contraseña" class="text-xs text-slate-300 hover:bg-dark-700 px-2.5 py-1.5 rounded-xl transition border border-dark-600 flex items-center space-x-1"><i class="fa-solid fa-key text-[11px]"></i><span class="hidden lg:inline">Clave</span></button>
+                    <button onclick="systemResetModal()" title="Reiniciar sistema" class="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl transition border border-rose-900/40 flex items-center space-x-1"><i class="fa-solid fa-rotate-left text-[11px]"></i><span class="hidden lg:inline">Reiniciar</span></button>
+                </div>
+
+                <!-- Celular: menú de 3 puntos -->
+                <div id="header-menu-wrap" class="relative md:hidden">
+                    <button id="header-menu-btn" onclick="toggleHeaderMenu()" aria-haspopup="true" aria-expanded="false" aria-label="Más opciones" class="w-10 h-10 flex items-center justify-center text-slate-300 hover:bg-dark-700 rounded-xl transition border border-dark-600">
+                        <i class="fa-solid fa-ellipsis-vertical text-base"></i>
+                    </button>
+                    <div id="header-menu" class="hidden absolute right-0 top-full mt-2 w-60 max-w-[calc(100vw-1.5rem)] bg-dark-800 border border-dark-600 rounded-2xl shadow-2xl p-1.5 z-50">
+                        <div class="px-3 py-2 text-[11px] font-mono text-slate-400 border-b border-dark-700 mb-1">Cobros hoy: <span class="text-cyan-400 font-bold" id="header-today-count-m">0 cuotas</span></div>
+                        <button onclick="toggleHeaderMenu(false);exportBackup()" class="w-full flex items-center space-x-3 px-3 py-3 rounded-xl text-xs text-emerald-400 hover:bg-dark-700 text-left"><i class="fa-solid fa-cloud-arrow-down w-4 text-center"></i><span>Descargar respaldo</span></button>
+                        <button onclick="toggleHeaderMenu(false);document.getElementById('backup-file').click()" class="w-full flex items-center space-x-3 px-3 py-3 rounded-xl text-xs text-slate-200 hover:bg-dark-700 text-left"><i class="fa-solid fa-cloud-arrow-up w-4 text-center"></i><span>Importar respaldo</span></button>
+                        <button onclick="toggleHeaderMenu(false);changePassword()" class="w-full flex items-center space-x-3 px-3 py-3 rounded-xl text-xs text-slate-200 hover:bg-dark-700 text-left"><i class="fa-solid fa-key w-4 text-center"></i><span>Cambiar contraseña</span></button>
+                        <button onclick="toggleHeaderMenu(false);systemResetModal()" class="w-full flex items-center space-x-3 px-3 py-3 rounded-xl text-xs text-rose-400 hover:bg-rose-950/40 text-left"><i class="fa-solid fa-rotate-left w-4 text-center"></i><span>Reiniciar sistema</span></button>
+                    </div>
+                </div>
+
+                <button onclick="handleLogout()" title="Cerrar sesión" aria-label="Salir" class="h-10 md:h-auto min-w-[2.5rem] md:min-w-0 justify-center text-xs text-slate-300 hover:text-white hover:bg-dark-700 px-2.5 md:py-1.5 rounded-xl transition border border-dark-600 flex items-center space-x-1 font-mono">
+                    <i class="fa-solid fa-right-from-bracket text-[12px] text-cyan-400"></i>
+                    <span class="hidden lg:inline">Salir</span>
                 </button>
             </div>
         </div>
@@ -251,7 +233,7 @@
         </div>
 
         <!-- Mobile Sticky Bottom Navigation -->
-        <div class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900 border-t border-dark-700 z-40 px-2 py-2 flex justify-around items-center backdrop-blur-md bg-opacity-95">
+        <div class="md:hidden fixed bottom-0 left-0 right-0 bg-dark-900 border-t border-dark-700 z-40 px-2 pt-2 safe-bottom flex justify-around items-center backdrop-blur-md bg-opacity-95">
             <button onclick="switchTab('dashboard')" id="mob-tab-dashboard" class="mob-tab-btn flex flex-col items-center text-cyan-400 font-bold">
                 <i class="fa-solid fa-chart-line text-lg"></i>
                 <span class="text-[9px] mt-0.5">Inicio</span>
@@ -284,7 +266,7 @@
                             <p class="text-[10px] sm:text-xs text-slate-400 font-mono">Capital Prestado</p>
                             <h3 class="text-lg sm:text-2xl font-black text-white mt-1 font-mono" id="dash-capital">S/ 0.00</h3>
                         </div>
-                        <div class="p-2 sm:p-2.5 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800/40">
+                        <div class="hidden min-[420px]:block p-2 sm:p-2.5 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800/40">
                             <i class="fa-solid fa-hand-holding-dollar text-base sm:text-lg"></i>
                         </div>
                     </div>
@@ -296,7 +278,7 @@
                             <p class="text-[10px] sm:text-xs text-slate-400 font-mono">Total Recaudado</p>
                             <h3 class="text-lg sm:text-2xl font-black text-emerald-400 mt-1 font-mono" id="dash-cobrado">S/ 0.00</h3>
                         </div>
-                        <div class="p-2 sm:p-2.5 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/40">
+                        <div class="hidden min-[420px]:block p-2 sm:p-2.5 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/40">
                             <i class="fa-solid fa-sack-dollar text-base sm:text-lg"></i>
                         </div>
                     </div>
@@ -308,7 +290,7 @@
                             <p class="text-[10px] sm:text-xs text-slate-400 font-mono">Saldo Pendiente</p>
                             <h3 class="text-lg sm:text-2xl font-black text-blue-400 mt-1 font-mono" id="dash-pendiente">S/ 0.00</h3>
                         </div>
-                        <div class="p-2 sm:p-2.5 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/40">
+                        <div class="hidden min-[420px]:block p-2 sm:p-2.5 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/40">
                             <i class="fa-solid fa-clock-rotate-left text-base sm:text-lg"></i>
                         </div>
                     </div>
@@ -320,7 +302,7 @@
                             <p class="text-[10px] sm:text-xs text-slate-400 font-mono">Cuotas en Mora</p>
                             <h3 class="text-lg sm:text-2xl font-black text-rose-400 mt-1 font-mono" id="dash-cuotas-vencidas">0 cuotas</h3>
                         </div>
-                        <div class="p-2 sm:p-2.5 rounded-xl bg-rose-950 text-rose-400 border border-rose-800/40">
+                        <div class="hidden min-[420px]:block p-2 sm:p-2.5 rounded-xl bg-rose-950 text-rose-400 border border-rose-800/40">
                             <i class="fa-solid fa-triangle-exclamation text-base sm:text-lg"></i>
                         </div>
                     </div>
@@ -691,7 +673,7 @@
                             <i class="fa-solid fa-shield-halved"></i>
                             <span>Auditoría de Transacciones Credicocha's</span>
                         </h3>
-                        <p class="text-xs text-slate-400">Historial de desembolsos y cobros registrados en este dispositivo. Descargue respaldos con frecuencia.</p>
+                        <p class="text-xs text-slate-400">Historial de desembolsos y cobros registrados en el sistema. Descargue respaldos con frecuencia.</p>
                     </div>
                     <button onclick="exportAuditLog()" class="w-full md:w-auto bg-dark-700 hover:bg-dark-600 text-xs px-3 py-2 rounded-xl border border-dark-600 text-slate-300 font-mono flex items-center justify-center">
                         <i class="fa-solid fa-download mr-1.5"></i> Exportar Audit JSON
@@ -726,8 +708,8 @@
     </footer>
 
     <!-- MODAL 1: CRONOGRAMA DE CUOTAS DEL CLIENTE (MOBILE OPTIMIZED) -->
-    <div id="modal-schedule" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden items-center justify-center z-50 p-2 sm:p-4">
-        <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-4xl w-full p-4 sm:p-6 shadow-2xl relative flex flex-col h-[95vh] sm:h-auto sm:max-h-[90vh]">
+    <div id="modal-schedule" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden overflow-y-auto z-50 p-2 sm:p-4">
+        <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-4xl w-full mx-auto my-auto p-4 sm:p-6 shadow-2xl relative flex flex-col h-[95vh] h-[95dvh] sm:h-auto sm:max-h-[90vh]">
             <button onclick="closeModal('modal-schedule')" class="absolute top-3 right-3 text-slate-400 hover:text-white p-2">
                 <i class="fa-solid fa-xmark text-xl"></i>
             </button>
@@ -796,8 +778,8 @@
     </div>
 
     <!-- MODAL DE SELECCIÓN DE MÉTODO DE PAGO Y CONFIRMACIÓN DE COBRO -->
-    <div id="modal-pay-confirm" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
-        <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative">
+    <div id="modal-pay-confirm" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden overflow-y-auto z-50 p-3">
+        <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-md w-full mx-auto my-auto p-5 sm:p-6 shadow-2xl relative">
             <button onclick="closeModal('modal-pay-confirm')" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
@@ -861,27 +843,17 @@
     </div>
 
     <!-- MODAL 3: IMPRESIÓN/RECIBO INDIVIDUAL -->
-    <div id="modal-receipt" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
-        <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl relative">
+    <div id="modal-receipt" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden overflow-y-auto z-50 p-3">
+        <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-sm w-full mx-auto my-auto p-4 sm:p-6 shadow-2xl relative">
             <button onclick="closeModal('modal-receipt')" class="no-print absolute top-4 right-4 text-slate-400 hover:text-white p-1">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
             
             <div id="printable-area" class="bg-white text-slate-900 p-5 rounded-xl space-y-3.5 font-mono text-xs">
                 <div class="text-center border-b border-slate-200 pb-2.5">
-                    <div class="w-16 h-12 mx-auto mb-1">
-                        <svg viewBox="0 0 200 160" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M 60 120 A 45 45 0 0 0 145 105" fill="none" stroke="#65a30d" stroke-width="14" stroke-linecap="round" />
-                            <path d="M 35 118 L 85 65 L 105 85 L 165 30" fill="none" stroke="#1e293b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-                            <polygon points="165,15 170,45 140,32" fill="#0284c7"/>
-                            <circle cx="85" cy="65" r="6" fill="#65a30d"/>
-                            <circle cx="100" cy="45" r="6" fill="#16a34a"/>
-                            <circle cx="118" cy="58" r="6" fill="#0284c7"/>
-                            <circle cx="110" cy="85" r="6" fill="#d97706"/>
-                            <circle cx="90" cy="78" r="6" fill="#9333ea"/>
-                        </svg>
+                    <div class="logo-plaque w-32 mx-auto mb-1.5 rounded-lg border border-slate-200">
+                        <img src="assets/logo.png" alt="Credicocha's" width="483" height="456" class="block w-full h-auto">
                     </div>
-                    <h2 class="text-xl font-black tracking-widest text-slate-900">CREDICOCHA'S</h2>
                     <p class="text-[10px] text-slate-600">COMPROBANTE DE COBRO DE CUOTA</p>
                     <p class="text-[10px] text-slate-500 mt-0.5" id="rec-fecha">---</p>
                 </div>
@@ -943,84 +915,16 @@
         </div>
     </div>
 
-    <!-- MODAL 4: CAMBIO SEGURO DE CONTRASEÑA (OCULTA CARACTERES) -->
-    <div id="modal-password" class="fixed inset-0 bg-black/90 backdrop-blur-md hidden items-center justify-center z-50 p-3">
-        <div class="bg-dark-800 border border-cyan-500/40 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative">
-            <button id="btn-close-pwd-modal" onclick="closeModal('modal-password')" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-            <div class="border-b border-dark-700 pb-3 mb-4">
-                <h3 class="text-base font-extrabold text-cyan-400 flex items-center space-x-2">
-                    <i class="fa-solid fa-user-lock"></i>
-                    <span id="pwd-modal-title">Cambiar Contraseña</span>
-                </h3>
-                <p class="text-xs text-slate-400 mt-1" id="pwd-modal-desc">Use una contraseña segura de al menos 8 caracteres.</p>
-            </div>
-            <form onsubmit="submitChangePassword(event)" class="space-y-3.5">
-                <div id="pwd-error" class="hidden bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs p-2.5 rounded-xl font-mono text-center"></div>
-                <div id="pwd-current-wrap">
-                    <label class="block text-xs font-mono text-slate-300 mb-1">Contraseña Actual *</label>
-                    <input type="password" id="pwd-current" autocomplete="current-password" placeholder="••••••••" class="w-full bg-dark-700 border border-dark-600 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono">
-                </div>
-                <div>
-                    <label class="block text-xs font-mono text-slate-300 mb-1">Nueva Contraseña (mín. 8 caracteres) *</label>
-                    <input type="password" id="pwd-new" required minlength="8" autocomplete="new-password" placeholder="••••••••" class="w-full bg-dark-700 border border-dark-600 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono">
-                </div>
-                <div>
-                    <label class="block text-xs font-mono text-slate-300 mb-1">Repetir Nueva Contraseña *</label>
-                    <input type="password" id="pwd-repeat" required minlength="8" autocomplete="new-password" placeholder="••••••••" class="w-full bg-dark-700 border border-dark-600 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono">
-                </div>
-                <button type="submit" class="w-full py-3 bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-slate-950 font-black rounded-xl text-xs transition shadow-neon-cyan flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-shield-check"></i>
-                    <span>GUARDAR NUEVA CONTRASEÑA</span>
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL 5: CONFIRMACIÓN DE SEGURIDAD CON CONTRASEÑA (REINICIAR / IMPORTAR) -->
-    <div id="modal-security-confirm" class="fixed inset-0 bg-black/90 backdrop-blur-md hidden items-center justify-center z-50 p-3">
-        <div class="bg-dark-800 border border-rose-500/40 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative">
-            <button onclick="closeModal('modal-security-confirm')" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-            <div class="border-b border-dark-700 pb-3 mb-4">
-                <h3 class="text-base font-extrabold text-rose-400 flex items-center space-x-2">
-                    <i class="fa-solid fa-shield-halved"></i>
-                    <span id="sec-modal-title">Verificación de Seguridad</span>
-                </h3>
-                <p class="text-xs text-slate-300 mt-1" id="sec-modal-desc">Esta operación reemplazará los datos de la base de datos.</p>
-            </div>
-            <form onsubmit="submitSecurityAction(event)" class="space-y-3.5">
-                <div id="sec-error" class="hidden bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs p-2.5 rounded-xl font-mono text-center"></div>
-                <div id="sec-confirm-word-wrap" class="hidden">
-                    <label class="block text-xs font-mono text-rose-300 mb-1">Escriba <strong>BORRAR</strong> en mayúsculas para confirmar *</label>
-                    <input type="text" id="sec-confirm-word" placeholder="BORRAR" class="w-full bg-dark-700 border border-rose-500/40 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-400 font-mono">
-                </div>
-                <div>
-                    <label class="block text-xs font-mono text-slate-300 mb-1">Ingrese su Contraseña Actual de Administrador *</label>
-                    <input type="password" id="sec-password" required autocomplete="current-password" placeholder="••••••••" class="w-full bg-dark-700 border border-dark-600 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-400 font-mono">
-                </div>
-                <button type="submit" class="w-full py-3 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white font-black rounded-xl text-xs transition flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-lock"></i>
-                    <span id="sec-submit-label">CONFIRMAR Y EJECUTAR</span>
-                </button>
-            </form>
-        </div>
-    </div>
-
     <!-- JAVASCRIPT APP LOGIC -->
     <script>
-        // ===== Configuración / estado (compatible con Firebase Hosting + Render + Neon PostgreSQL) =====
-        const API_URL = (document.querySelector('meta[name="credicochas-api-url"]')?.content || window.CREDICOCHAS_API_URL || 'api.php').trim();
+        // ===== Configuración / estado (PostgreSQL Neon / MySQL — se piden a api.php) =====
+        const API_URL = 'api.php';
         const TOKEN_STORAGE_KEY = 'credicochas_session_token';
         let MORA_FEE = 10;            // se sincroniza con MORA_FEE del .env
         let APP_TZ = 'America/Lima';  // se sincroniza con APP_TIMEZONE del .env
         let clockOffsetMs = 0;        // diferencia entre el reloj del servidor y el del dispositivo
         let csrfToken = '';
         let sessionToken = sessionStorage.getItem(TOKEN_STORAGE_KEY) || '';
-        let forcedPasswordChange = false;
-        let pendingSecurityAction = null;
         let clients = [], loans = [], auditLogs = [];
         let financialChartInstance = null;
         let statusChartInstance = null;
@@ -1086,7 +990,7 @@
             try { return await fn(); } finally { if (btn) btn.disabled = false; }
         }
 
-        // ===== Comunicación con api.php (Cookie HttpOnly + Bearer Token + CSRF) =====
+        // ===== Comunicación con api.php =====
         async function api(action, data) {
             const isPost = data !== undefined;
             const headers = {};
@@ -1098,21 +1002,20 @@
                 headers['Content-Type'] = 'application/json';
                 headers['X-CSRF-Token'] = csrfToken;
             }
-            const sep = API_URL.includes('?') ? '&' : '?';
             let res;
             try {
-                res = await fetch(API_URL + sep + 'action=' + encodeURIComponent(action), {
+                res = await fetch(API_URL + '?action=' + encodeURIComponent(action), {
                     method: isPost ? 'POST' : 'GET',
-                    credentials: API_URL.startsWith('http') ? 'include' : 'same-origin',
+                    credentials: 'same-origin',
                     headers,
                     body: isPost ? JSON.stringify(data) : undefined
                 });
-            } catch (e) { throw new Error('No hay conexión con el servidor. Revise su internet o la URL del servidor.'); }
+            } catch (e) { throw new Error('No hay conexión con el servidor. Revise su internet.'); }
             let json = null;
             try { json = await res.json(); } catch (e) { /* respuesta no-JSON */ }
             if (res.status === 401 && action !== 'login') { showLogin('Sesión expirada. Ingrese nuevamente.'); throw new Error('Sesión expirada. Ingrese nuevamente.'); }
             if (!res.ok || !json || json.ok === false) {
-                throw new Error((json && json.error) || 'Error del servidor (' + res.status + '). Verifique que el backend y la base de datos estén activos.');
+                throw new Error((json && json.error) || 'Error del servidor (' + res.status + '). Verifique que api.php y la base de datos estén instalados.');
             }
             return json;
         }
@@ -1137,8 +1040,6 @@
             csrfToken = ''; sessionToken = '';
             sessionStorage.removeItem(TOKEN_STORAGE_KEY);
             clients = []; loans = []; auditLogs = [];
-            closeModal('modal-password');
-            closeModal('modal-security-confirm');
             document.getElementById('login-screen').classList.remove('hidden');
             if (msg) showLoginError(msg);
         }
@@ -1150,13 +1051,9 @@
             updateBadges();
         }
         async function enterApp(s) {
+            await loadAll();
             document.getElementById('login-error').classList.add('hidden');
             document.getElementById('login-screen').classList.add('hidden');
-            if (s.mustChange) {
-                changePassword(true);
-                return;
-            }
-            await loadAll();
             const hoy = hoyISO();
             const expFrom = document.getElementById('export-date-from'); if (expFrom) expFrom.value = hoy;
             const expTo = document.getElementById('export-date-to'); if (expTo) expTo.value = hoy;
@@ -1164,6 +1061,7 @@
             if (dateDisplay) dateDisplay.innerText = new Date(Date.now() + clockOffsetMs).toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: APP_TZ });
             setDefaultLoanDate();
             renderDashboard();
+            if (s.mustChange) setTimeout(() => changePassword(true), 200);
         }
         async function initSession() {
             try {
@@ -1192,61 +1090,39 @@
             showLogin();
         }
 
-        function changePassword(forced = false) {
-            forcedPasswordChange = forced;
-            document.getElementById('pwd-error').classList.add('hidden');
-            document.getElementById('pwd-current').value = '';
-            document.getElementById('pwd-new').value = '';
-            document.getElementById('pwd-repeat').value = '';
-            document.getElementById('pwd-current-wrap').classList.toggle('hidden', forced);
-            document.getElementById('pwd-current').required = !forced;
-            document.getElementById('btn-close-pwd-modal').classList.toggle('hidden', forced);
-            document.getElementById('pwd-modal-title').innerText = forced ? 'Cambio de Contraseña Obligatorio' : 'Cambiar Contraseña';
-            document.getElementById('pwd-modal-desc').innerText = forced
-                ? 'Por seguridad, cree su contraseña definitiva (mínimo 8 caracteres) antes de usar el sistema.'
-                : 'Ingrese su contraseña actual y la nueva contraseña (mínimo 8 caracteres).';
-            const modal = document.getElementById('modal-password');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        async function submitChangePassword(e) {
-            e.preventDefault();
-            const errBox = document.getElementById('pwd-error');
-            errBox.classList.add('hidden');
-            const actual = document.getElementById('pwd-current').value;
-            const nueva = document.getElementById('pwd-new').value;
-            const repeat = document.getElementById('pwd-repeat').value;
-
-            if (nueva.length < 8 || nueva === '12345678') {
-                errBox.innerText = 'La nueva contraseña debe tener al menos 8 caracteres.';
-                errBox.classList.remove('hidden');
-                return;
+        async function changePassword(forced = false) {
+            let actual = '';
+            if (!forced) {
+                const a = prompt('Contraseña actual:');
+                if (a === null) return;
+                actual = a;
             }
-            if (nueva !== repeat) {
-                errBox.innerText = 'Las contraseñas nuevas no coinciden.';
-                errBox.classList.remove('hidden');
-                return;
+            let nueva;
+            while (true) {
+                nueva = prompt(forced ? 'Por seguridad, cree una nueva contraseña (mínimo 6 caracteres):' : 'Nueva contraseña (mínimo 6 caracteres):');
+                if (nueva === null) return;
+                if (nueva.length < 6 || nueva === '123') { alert('La contraseña debe tener al menos 6 caracteres y no puede ser "123".'); continue; }
+                const rep = prompt('Repita la nueva contraseña:');
+                if (rep === null) return;
+                if (rep !== nueva) { alert('Las contraseñas no coinciden.'); continue; }
+                break;
             }
-
-            await runBusy(e.target, async () => {
-                try {
-                    await api('change_password', { actual, nueva });
-                    const wasForced = forcedPasswordChange;
-                    forcedPasswordChange = false;
-                    closeModal('modal-password');
-                    if (wasForced) {
-                        await enterApp({ mustChange: false });
-                    }
-                    alert('Contraseña actualizada con éxito.');
-                } catch (err) {
-                    errBox.innerText = err.message;
-                    errBox.classList.remove('hidden');
-                }
-            });
+            try { await api('change_password', { actual, nueva }); alert('Contraseña actualizada.'); }
+            catch (err) { alert(err.message); if (forced) return changePassword(true); }
         }
 
         window.onload = function() { initSession(); };
+
+        // Menú de 3 puntos del header (celular)
+        function toggleHeaderMenu(force) {
+            const m = document.getElementById('header-menu'), b = document.getElementById('header-menu-btn');
+            if (!m) return;
+            const open = (force === undefined) ? m.classList.contains('hidden') : !!force;
+            m.classList.toggle('hidden', !open);
+            if (b) b.setAttribute('aria-expanded', String(open));
+        }
+        document.addEventListener('click', e => { if (!e.target.closest('#header-menu-wrap')) toggleHeaderMenu(false); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleHeaderMenu(false); });
 
         // Los datos ya se guardan en el servidor en cada operación; esto solo refresca los contadores.
         function saveData() { updateBadges(); }
@@ -1908,20 +1784,17 @@
             const file = ev.target.files[0]; ev.target.value = '';
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = () => {
+            reader.onload = async () => {
                 try {
                     const d = JSON.parse(reader.result);
                     if (d.app !== 'credicochas' || !Array.isArray(d.clients) || !Array.isArray(d.loans) || !Array.isArray(d.auditLogs)) throw new SyntaxError('formato');
-                    openSecurityModal({
-                        type: 'import_backup',
-                        payload: d,
-                        title: 'Confirmar Importación de Respaldo',
-                        desc: `Se reemplazarán los datos actuales por el respaldo (${d.clients.length} clientes, ${d.loans.length} préstamos). Confirme con su contraseña actual.`,
-                        requireBorrar: false,
-                        submitLabel: 'IMPORTAR RESPALDO'
-                    });
+                    if (!confirm(`Se reemplazarán los datos actuales de la BASE DE DATOS por el respaldo (${d.clients.length} clientes, ${d.loans.length} préstamos). ¿Continuar?`)) return;
+                    await api('import_backup', d);
+                    await loadAll();
+                    renderClientsTable(); renderDashboard(); renderAuditTable(); populateClientSelect();
+                    alert('Respaldo importado correctamente.');
                 } catch (err) {
-                    alert('El archivo seleccionado no es un respaldo válido de Credicocha\'s.');
+                    alert(err instanceof SyntaxError ? 'El archivo no es un respaldo válido de Credicocha\'s.' : err.message);
                 }
             };
             reader.readAsText(file);
@@ -1939,6 +1812,7 @@
             document.getElementById('badge-hoy').innerText = hoyMasMora;
             document.getElementById('mob-badge-hoy').innerText = hoyMasMora;
             document.getElementById('header-today-count').innerText = `${hoy} cuotas`;
+            const hm = document.getElementById('header-today-count-m'); if (hm) hm.innerText = `${hoy} cuotas`;
             document.getElementById('audit-badge').innerText = auditLogs.length;
         }
 
@@ -2005,64 +1879,11 @@
         function printSchedule() { printWithMode('schedule'); }
         function printReceipt() { printWithMode('receipt'); }
 
-        function openSecurityModal(opts) {
-            pendingSecurityAction = opts;
-            document.getElementById('sec-error').classList.add('hidden');
-            document.getElementById('sec-password').value = '';
-            document.getElementById('sec-confirm-word').value = '';
-            document.getElementById('sec-modal-title').innerText = opts.title;
-            document.getElementById('sec-modal-desc').innerText = opts.desc;
-            document.getElementById('sec-submit-label').innerText = opts.submitLabel;
-            const wordWrap = document.getElementById('sec-confirm-word-wrap');
-            wordWrap.classList.toggle('hidden', !opts.requireBorrar);
-            document.getElementById('sec-confirm-word').required = !!opts.requireBorrar;
-            const modal = document.getElementById('modal-security-confirm');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        async function submitSecurityAction(e) {
-            e.preventDefault();
-            if (!pendingSecurityAction) return;
-            const errBox = document.getElementById('sec-error');
-            errBox.classList.add('hidden');
-            const password = document.getElementById('sec-password').value;
-            const word = document.getElementById('sec-confirm-word').value.trim();
-
-            if (pendingSecurityAction.requireBorrar && word !== 'BORRAR') {
-                errBox.innerText = 'Debe escribir exactamente BORRAR en mayúsculas.';
-                errBox.classList.remove('hidden');
-                return;
-            }
-
-            await runBusy(e.target, async () => {
-                try {
-                    if (pendingSecurityAction.type === 'reset') {
-                        await api('reset', { confirm: 'BORRAR', password });
-                        closeModal('modal-security-confirm');
-                        location.reload();
-                    } else if (pendingSecurityAction.type === 'import_backup') {
-                        await api('import_backup', { ...pendingSecurityAction.payload, password });
-                        closeModal('modal-security-confirm');
-                        await loadAll();
-                        renderClientsTable(); renderDashboard(); renderAuditTable(); populateClientSelect();
-                        alert('Respaldo importado correctamente.');
-                    }
-                } catch (err) {
-                    errBox.innerText = err.message;
-                    errBox.classList.remove('hidden');
-                }
-            });
-        }
-
-        function systemResetModal() {
-            openSecurityModal({
-                type: 'reset',
-                title: 'Reiniciar Sistema de Base de Datos',
-                desc: 'Se borrarán TODOS los clientes, préstamos, cuotas y la auditoría de la base de datos. Descargue un respaldo antes de continuar.',
-                requireBorrar: true,
-                submitLabel: 'BORRAR TODO Y REINICIAR'
-            });
+        async function systemResetModal() {
+            if (!confirm('Se borrarán TODOS los clientes, préstamos y la auditoría de la BASE DE DATOS. Descargue un respaldo antes. ¿Desea continuar?')) return;
+            if (prompt('Escriba BORRAR para confirmar:') !== 'BORRAR') return;
+            try { await api('reset', { confirm: 'BORRAR' }); location.reload(); }
+            catch (err) { alert(err.message); }
         }
 
     </script>
