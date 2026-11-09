@@ -993,7 +993,7 @@
             try { return await fn(); } finally { if (btn) btn.disabled = false; }
         }
 
-        // ===== Comunicación con api.php =====
+        // ===== Comunicación con api.php (con reintento automático si Render/Neon despierta de reposo 502/503/504) =====
         async function api(action, data) {
             const isPost = data !== undefined;
             const headers = {};
@@ -1006,19 +1006,36 @@
                 headers['X-CSRF-Token'] = csrfToken;
             }
             let res;
-            try {
-                res = await fetch(API_URL + '?action=' + encodeURIComponent(action), {
-                    method: isPost ? 'POST' : 'GET',
-                    credentials: 'same-origin',
-                    headers,
-                    body: isPost ? JSON.stringify(data) : undefined
-                });
-            } catch (e) { throw new Error('No hay conexión con el servidor. Revise su internet.'); }
+            const maxAttempts = 5;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    res = await fetch(API_URL + '?action=' + encodeURIComponent(action), {
+                        method: isPost ? 'POST' : 'GET',
+                        credentials: 'same-origin',
+                        headers,
+                        body: isPost ? JSON.stringify(data) : undefined
+                    });
+                    if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxAttempts) {
+                        await new Promise(r => setTimeout(r, 2500));
+                        continue;
+                    }
+                    break;
+                } catch (e) {
+                    if (attempt < maxAttempts) {
+                        await new Promise(r => setTimeout(r, 2500));
+                        continue;
+                    }
+                    throw new Error('No hay conexión con el servidor. Revise su internet.');
+                }
+            }
             let json = null;
             try { json = await res.json(); } catch (e) { /* respuesta no-JSON */ }
             if (res.status === 401 && action !== 'login') { showLogin('Sesión expirada. Ingrese nuevamente.'); throw new Error('Sesión expirada. Ingrese nuevamente.'); }
             if (!res.ok || !json || json.ok === false) {
-                throw new Error((json && json.error) || 'Error del servidor (' + res.status + '). Verifique que api.php y la base de datos estén instalados.');
+                if (res.status === 502 || res.status === 503 || res.status === 504) {
+                    throw new Error('El servidor se está activando. Por favor intente nuevamente en unos segundos.');
+                }
+                throw new Error((json && json.error) || 'Error del servidor (' + res.status + '). Intente nuevamente.');
             }
             return json;
         }
@@ -1071,7 +1088,9 @@
                 const s = await api('session');
                 applyServerMeta(s);
                 if (s.auth) await enterApp(s); else showLogin();
-            } catch (e) { showLogin(e.message); }
+            } catch (e) { showLogin(); }
+            // Mantiene despierto el servidor de Render mientras la pestaña esté abierta
+            setInterval(() => { fetch(API_URL + '?action=session', { credentials: 'same-origin' }).catch(() => {}); }, 8 * 60 * 1000);
         }
 
         async function handleLogin(e) {

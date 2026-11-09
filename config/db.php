@@ -166,7 +166,7 @@ function db(): PDO
         // En PostgreSQL (Neon Pooler / PgBouncer transaction mode), ATTR_EMULATE_PREPARES=true
         // usa PQescapeLiteral nativo de libpq evitando colisiones de prepared statements en el pooler.
         PDO::ATTR_EMULATE_PREPARES   => ($driver === 'pgsql'),
-        PDO::ATTR_TIMEOUT            => 10,
+        PDO::ATTR_TIMEOUT            => 15,
     ];
 
     if ($driver === 'pgsql') {
@@ -182,23 +182,35 @@ function db(): PDO
         $dsn = "mysql:host={$host};port={$port};dbname={$name};charset={$charset}";
     }
 
-    try {
-        $pdo = new PDO($dsn, $user, $pass, $pdoOpts);
-    } catch (PDOException $e) {
-        // Fallback para clientes libpq antiguos (ej. Windows sin SNI) que piden explícitamente endpoint=...
-        if ($driver === 'pgsql' && strpos($e->getMessage(), 'Endpoint ID is not specified') !== false) {
-            $firstLabel = explode('.', $host)[0];
-            $endpoint   = (string) preg_replace('/-pooler$/i', '', $firstLabel);
-            try {
-                $pdo = new PDO($dsn . ";options='endpoint={$endpoint}'", $user, $pass, $pdoOpts);
-            } catch (PDOException $e2) {
-                error_log('[credicochas] No se pudo conectar a la BD (pgsql fallback): ' . $e2->getMessage());
-                throw new DbConnectionError('No se pudo conectar a la base de datos.');
+    $lastEx = null;
+    for ($attempt = 1; $attempt <= 3; $attempt++) {
+        try {
+            $pdo = new PDO($dsn, $user, $pass, $pdoOpts);
+            $lastEx = null;
+            break;
+        } catch (PDOException $e) {
+            // Fallback para clientes libpq antiguos (ej. Windows sin SNI) que piden explícitamente endpoint=...
+            if ($driver === 'pgsql' && strpos($e->getMessage(), 'Endpoint ID is not specified') !== false) {
+                $firstLabel = explode('.', $host)[0];
+                $endpoint   = (string) preg_replace('/-pooler$/i', '', $firstLabel);
+                try {
+                    $pdo = new PDO($dsn . ";options='endpoint={$endpoint}'", $user, $pass, $pdoOpts);
+                    $lastEx = null;
+                    break;
+                } catch (PDOException $e2) {
+                    $lastEx = $e2;
+                }
+            } else {
+                $lastEx = $e;
             }
-        } else {
-            error_log('[credicochas] No se pudo conectar a la BD (' . $driver . '): ' . $e->getMessage());
-            throw new DbConnectionError('No se pudo conectar a la base de datos.');
+            if ($attempt < 3) {
+                usleep(800000); // 0.8s de espera mientras Neon despierta de suspensión
+            }
         }
+    }
+    if ($lastEx !== null) {
+        error_log('[credicochas] No se pudo conectar a la BD (' . $driver . '): ' . $lastEx->getMessage());
+        throw new DbConnectionError('No se pudo conectar a la base de datos.');
     }
 
     $offset = (new DateTimeImmutable('now', $tz))->format('P');
