@@ -1,0 +1,15 @@
+name: Keep Render Active 24/7
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Credicocha's Public Endpoint
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 "https://credicochas.dynastron.com/api.php?action=ping"
+          curl -fsS --retry 3 --retry-delay 5 "https://dynastron-credicochas.onrender.com/api.php?action=ping"

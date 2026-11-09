@@ -1008,8 +1008,25 @@ function do_reset(PDO $pdo, array $auth): void
 send_security_and_cors_headers();
 
 try {
-    $pdo = db();
     $action = isset($_GET['action']) ? (string) $_GET['action'] : '';
+    if ($action === 'ping') {
+        respond(['ok' => true, 'ts' => time()]);
+    }
+    if ($action === 'session' && get_incoming_token() === '') {
+        expect_method('GET');
+        respond([
+            'ok'           => true,
+            'auth'         => false,
+            'user'         => null,
+            'mustChange'   => false,
+            'csrf'         => '',
+            'sessionToken' => '',
+            'moraFee'      => mora_fee(),
+            'timezone'     => app_tz()->getName(),
+            'serverTime'   => time(),
+        ]);
+    }
+    $pdo = db();
 
     switch ($action) {
         case 'session':
