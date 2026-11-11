@@ -202,12 +202,23 @@ function client_ip(): string
 // ============================================================================
 function ensure_schema(PDO $pdo): void
 {
+    $tablas = [
+        'usuarios',
+        'sesiones',
+        'login_intentos',
+        'clientes',
+        'prestamos',
+        'cuotas',
+        'auditoria'
+    ];
+
     try {
-        $pdo->query('SELECT 1 FROM sesiones LIMIT 1');
-        $pdo->query('SELECT 1 FROM cuotas LIMIT 1');
+        foreach ($tablas as $tabla) {
+            $pdo->query("SELECT 1 FROM {$tabla} LIMIT 1");
+        }
         return;
     } catch (PDOException $e) {
-        // Si falta alguna tabla (ej. base recién creada en Neon), importamos el esquema automáticamente
+        // Falta alguna tabla: intentar inicializar el esquema.
     }
 
     $sqlFile = is_pgsql()
@@ -215,15 +226,17 @@ function ensure_schema(PDO $pdo): void
         : __DIR__ . '/database.sql';
 
     if (!is_readable($sqlFile)) {
-        return;
+        throw new RuntimeException('No se encuentra el archivo de esquema de la base de datos.');
     }
+
     $sql = (string) file_get_contents($sqlFile);
+
     if (is_pgsql()) {
         $pdo->exec($sql);
     } else {
-        // En MySQL ejecutamos la sección de tablas (antes de DELIMITER $$)
         $parts = explode('DELIMITER $$', $sql);
         $tableSql = $parts[0];
+
         foreach (array_filter(array_map('trim', explode(';', $tableSql))) as $stmt) {
             $clean = trim((string) preg_replace('/^\s*--.*$/m', '', $stmt));
             if ($clean !== '') {
@@ -232,7 +245,6 @@ function ensure_schema(PDO $pdo): void
         }
     }
 }
-
 // ============================================================================
 //  Extensiones v3.1: mora por cuota, ajustes y caja
 // ============================================================================
@@ -684,7 +696,7 @@ function next_client_id(PDO $pdo): string
         $pdo->exec('LOCK TABLE clientes IN SHARE ROW EXCLUSIVE MODE');
         $next = (int) $pdo->query("SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 5) AS INTEGER)), 0) + 1 FROM clientes")->fetchColumn();
     } else {
-        $next = (int) $pdo->query("SELECT COALESCE(MAX(CAST(SUBSTRING(id, 5) AS UNSIGNED)), 0) + 1 FROM clientes FOR UPDATE")->fetchColumn();
+        $next = (int) $pdo->query("SELECT COALESCE(MAX(CAST(SUBSTRING(id, 5) AS UNSIGNED)), 0) + 1 FROM clientes")->fetchColumn();
     }
     return 'CLI-' . $next;
 }
@@ -707,21 +719,51 @@ function do_create_client(PDO $pdo, array $auth): void
         throw new ApiError('Teléfono inválido.', 422);
     }
 
-    $res = tx($pdo, function () use ($pdo, $auth, $nombre, $dni, $telefono, $direccion) {
-        $st = $pdo->prepare('SELECT 1 FROM clientes WHERE dni = ?');
-        $st->execute([$dni]);
-        if ($st->fetchColumn()) {
-            throw new ApiError('Ya existe un cliente registrado con ese DNI/RUC.', 409);
+    $bloqueoId = false;
+
+    if (!is_pgsql()) {
+        $lock = (int) $pdo->query("SELECT GET_LOCK('credicochas_client_id', 10)")->fetchColumn();
+        if ($lock !== 1) {
+            throw new ApiError('No se pudo reservar un código de cliente. Intente nuevamente.', 503);
         }
-        $id = next_client_id($pdo);
-        $pdo->prepare('INSERT INTO clientes (id, nombre, dni, telefono, direccion) VALUES (?,?,?,?,?)')
-            ->execute([$id, $nombre, $dni, $telefono, $direccion]);
-        $audit = log_audit($pdo, 'CLIENTE_CREADO', $nombre, '-', 0, '-', '-', $auth['user']);
-        return ['client' => ['id' => $id, 'nombre' => $nombre, 'dni' => $dni, 'telefono' => $telefono, 'direccion' => $direccion], 'audit' => $audit];
-    });
+        $bloqueoId = true;
+    }
+
+    try {
+        $res = tx($pdo, function () use ($pdo, $auth, $nombre, $dni, $telefono, $direccion) {
+            $st = $pdo->prepare('SELECT 1 FROM clientes WHERE dni = ?');
+            $st->execute([$dni]);
+
+            if ($st->fetchColumn()) {
+                throw new ApiError('Ya existe un cliente registrado con ese DNI/RUC.', 409);
+            }
+
+            $id = next_client_id($pdo);
+
+            $pdo->prepare('INSERT INTO clientes (id, nombre, dni, telefono, direccion) VALUES (?,?,?,?,?)')
+                ->execute([$id, $nombre, $dni, $telefono, $direccion]);
+
+            $audit = log_audit($pdo, 'CLIENTE_CREADO', $nombre, '-', 0, '-', '-', $auth['user']);
+
+            return [
+                'client' => [
+                    'id' => $id,
+                    'nombre' => $nombre,
+                    'dni' => $dni,
+                    'telefono' => $telefono,
+                    'direccion' => $direccion
+                ],
+                'audit' => $audit
+            ];
+        });
+    } finally {
+        if ($bloqueoId) {
+            $pdo->query("SELECT RELEASE_LOCK('credicochas_client_id')");
+        }
+    }
+
     respond(['ok' => true] + $res, 201);
 }
-
 /** Cronograma: reparte el total en centavos (la última cuota absorbe el resto). */
 function build_schedule(float $total, int $n, string $freq, string $start, bool $omitirDomingos): array
 {
