@@ -234,6 +234,40 @@ function ensure_schema(PDO $pdo): void
 }
 
 // ============================================================================
+//  Extensiones v3.1: mora por cuota, ajustes y caja
+// ============================================================================
+function ensure_feature_schema(PDO $pdo): void
+{
+    if (is_pgsql()) {
+        $pdo->exec("ALTER TABLE cuotas ADD COLUMN IF NOT EXISTS mora_omitida BOOLEAN NOT NULL DEFAULT FALSE");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS ajustes_mora (
+            id BIGSERIAL PRIMARY KEY, prestamo_id VARCHAR(20) NOT NULL, numero SMALLINT NOT NULL,
+            mora_anterior NUMERIC(10,2) NOT NULL, mora_nueva NUMERIC(10,2) NOT NULL,
+            motivo VARCHAR(255) NOT NULL DEFAULT '', usuario VARCHAR(50) NOT NULL, creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (prestamo_id, numero) REFERENCES cuotas(prestamo_id, numero) ON DELETE CASCADE
+        )");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS movimientos_caja (
+            id BIGSERIAL PRIMARY KEY, fecha DATE NOT NULL, tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('INGRESO','EGRESO')),
+            categoria VARCHAR(30) NOT NULL, descripcion VARCHAR(255) NOT NULL DEFAULT '', monto NUMERIC(12,2) NOT NULL CHECK (monto > 0),
+            usuario VARCHAR(50) NOT NULL, creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )");
+    } else {
+        try { $pdo->exec("ALTER TABLE cuotas ADD COLUMN mora_omitida TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException $e) { if (stripos($e->getMessage(), 'duplicate') === false && stripos($e->getMessage(), 'exists') === false) throw $e; }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS ajustes_mora (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, prestamo_id VARCHAR(20) NOT NULL, numero SMALLINT UNSIGNED NOT NULL,
+            mora_anterior DECIMAL(10,2) NOT NULL, mora_nueva DECIMAL(10,2) NOT NULL, motivo VARCHAR(255) NOT NULL DEFAULT '',
+            usuario VARCHAR(50) NOT NULL, creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_ajustes_cuota(prestamo_id,numero), CONSTRAINT fk_ajustes_cuota FOREIGN KEY(prestamo_id,numero) REFERENCES cuotas(prestamo_id,numero) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS movimientos_caja (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, fecha DATE NOT NULL, tipo VARCHAR(10) NOT NULL,
+            categoria VARCHAR(30) NOT NULL, descripcion VARCHAR(255) NOT NULL DEFAULT '', monto DECIMAL(12,2) NOT NULL,
+            usuario VARCHAR(50) NOT NULL, creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, KEY idx_caja_fecha(fecha)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
+
+// ============================================================================
 //  Sesiones Persistentes en BD + Cookie HttpOnly + Bearer Token + CSRF
 // ============================================================================
 function session_hours(): int
@@ -367,6 +401,8 @@ function map_cuota(array $r): array
         'auditId'         => $r['audit_id'],
         'mora'            => $r['mora'] !== null ? (float) $r['mora'] : null,
         'montoCobrado'    => $r['monto_cobrado'] !== null ? (float) $r['monto_cobrado'] : null,
+        'moraOmitida'     => in_array($r['mora_omitida'] ?? false, [true, 1, '1', 't', 'true'], true),
+        'cobradoPor'      => $r['cobrado_por'] ?? null,
     ];
 }
 
@@ -388,6 +424,7 @@ function map_audit(array $r): array
         'montoFormateado' => 'S/ ' . number_format((float) $r['monto'], 2, '.', ''),
         'metodo'          => $metodo,
         'numOperacion'    => $op,
+        'usuario'         => $r['usuario'] ?? '',
     ];
 }
 
@@ -404,9 +441,20 @@ function load_loans(PDO $pdo, ?string $onlyId = null): array
         $st->execute([$onlyId]);
         $cuotas = $st->fetchAll();
     }
+    $ajustes = [];
+    foreach ($pdo->query('SELECT prestamo_id, numero, mora_nueva FROM ajustes_mora ORDER BY id')->fetchAll() as $a) {
+        $ajustes[$a['prestamo_id'] . ':' . $a['numero']] = (float) $a['mora_nueva'];
+    }
     $byLoan = [];
     foreach ($cuotas as $c) {
-        $byLoan[$c['prestamo_id']][] = map_cuota($c);
+        $mapped = map_cuota($c);
+        $key = $c['prestamo_id'] . ':' . $c['numero'];
+        if (isset($ajustes[$key])) {
+            // La mora mostrada refleja la corrección vigente, pero monto_cobrado conserva
+            // el importe que realmente ingresó a caja en la fecha del cobro.
+            $mapped['mora'] = $ajustes[$key];
+        }
+        $byLoan[$c['prestamo_id']][] = $mapped;
     }
     $out = [];
     foreach ($loans as $l) {
@@ -617,6 +665,16 @@ function do_bootstrap(PDO $pdo): void
         'loans'     => load_loans($pdo),
         'auditLogs' => array_map('map_audit', $pdo->query('SELECT * FROM auditoria ORDER BY seq DESC')->fetchAll()),
         'moraFee'   => mora_fee(),
+        'cashMovements' => $pdo->query('SELECT * FROM movimientos_caja ORDER BY fecha DESC, id DESC')->fetchAll(),
+        'moraAdjustments' => $pdo->query(
+            'SELECT a.id, a.prestamo_id, a.numero, a.mora_anterior, a.mora_nueva, a.motivo, a.usuario, a.creado_en,
+                    cl.nombre AS cliente, c.fecha_pago
+               FROM ajustes_mora a
+               JOIN prestamos p ON p.id = a.prestamo_id
+               JOIN clientes cl ON cl.id = p.cliente_id
+               JOIN cuotas c ON c.prestamo_id = a.prestamo_id AND c.numero = a.numero
+              ORDER BY a.creado_en DESC, a.id DESC'
+        )->fetchAll(),
     ]);
 }
 
@@ -774,7 +832,7 @@ function do_pay(PDO $pdo, array $auth): void
             throw new ApiError('Esta cuota ya fue cobrada.', 409);
         }
         $now   = now_dt();
-        $mora  = ($c['fecha_programada'] < $now->format('Y-m-d')) ? mora_fee() : 0.0;
+        $mora  = ($c['fecha_programada'] < $now->format('Y-m-d') && empty($c['mora_omitida'])) ? mora_fee() : 0.0;
         $total = round((float) $c['monto'] + $mora, 2);
         $auditId = new_audit_id($pdo);
 
@@ -798,6 +856,63 @@ function do_pay(PDO $pdo, array $auth): void
                          (string) $numero, $total, $metodo, $numOp, $auth['user'], $auditId);
     });
     respond(['ok' => true, 'loan' => load_loans($pdo, $loanId)[0], 'audit' => $audit]);
+}
+
+// ============================================================================
+//  Edición de cliente, mora y caja
+// ============================================================================
+function do_update_client(PDO $pdo, array $auth): void
+{
+    $in = read_json();
+    $id = clean_str($in['id'] ?? '', 20);
+    $nombre = clean_str($in['nombre'] ?? '', 150);
+    $dni = clean_str($in['dni'] ?? '', 11);
+    $telefono = clean_str($in['telefono'] ?? '', 20);
+    $direccion = clean_str($in['direccion'] ?? '', 255);
+    if ($id === '' || $nombre === '' || !preg_match('/^(\d{8}|\d{11})$/', $dni)) throw new ApiError('Datos de cliente inválidos.', 422);
+    tx($pdo, function () use ($pdo,$id,$nombre,$dni,$telefono,$direccion,$auth) {
+        $st=$pdo->prepare('SELECT id FROM clientes WHERE dni=? AND id<>?'); $st->execute([$dni,$id]);
+        if ($st->fetchColumn()) throw new ApiError('Ya existe otro cliente con ese DNI/RUC.',409);
+        $st=$pdo->prepare('UPDATE clientes SET nombre=?,dni=?,telefono=?,direccion=? WHERE id=?'); $st->execute([$nombre,$dni,$telefono,$direccion,$id]);
+        if (!$st->rowCount()) { $q=$pdo->prepare('SELECT 1 FROM clientes WHERE id=?'); $q->execute([$id]); if (!$q->fetchColumn()) throw new ApiError('Cliente no encontrado.',404); }
+        log_audit($pdo,'CLIENTE_EDITADO',$nombre,'-',0,'-','-',$auth['user']);
+    });
+    respond(['ok'=>true,'client'=>['id'=>$id,'nombre'=>$nombre,'dni'=>$dni,'telefono'=>$telefono,'direccion'=>$direccion]]);
+}
+function do_omit_mora(PDO $pdo, array $auth): void
+{
+    $in=read_json(); $loan=clean_str($in['loanId']??'',20); $n=(int)($in['numero']??0); $omit=!empty($in['omit']);
+    if ($loan==='' || $n<1) throw new ApiError('Cuota inválida.',422);
+    tx($pdo,function() use($pdo,$auth,$loan,$n,$omit) {
+        $st=$pdo->prepare('SELECT c.estado,c.fecha_programada,cl.nombre FROM cuotas c JOIN prestamos p ON p.id=c.prestamo_id JOIN clientes cl ON cl.id=p.cliente_id WHERE c.prestamo_id=? AND c.numero=? FOR UPDATE');
+        $st->execute([$loan,$n]); $c=$st->fetch(); if(!$c) throw new ApiError('Cuota no encontrada.',404);
+        if($c['estado']!=='PENDIENTE') throw new ApiError('Solo puede omitir o restaurar mora de cuotas pendientes.',409);
+        $up=$pdo->prepare('UPDATE cuotas SET mora_omitida=? WHERE prestamo_id=? AND numero=?'); $up->execute([$omit?1:0,$loan,$n]);
+        log_audit($pdo,$omit?'MORA_OMITIDA':'MORA_RESTAURADA',(string)$c['nombre'],(string)$n,0,'-','-',$auth['user']);
+    });
+    respond(['ok'=>true,'loan'=>load_loans($pdo,$loan)[0]]);
+}
+function do_adjust_mora(PDO $pdo, array $auth): void
+{
+    $in=read_json(); $loan=clean_str($in['loanId']??'',20); $n=(int)($in['numero']??0); $new=num($in['mora']??null); $reason=clean_str($in['motivo']??'Corrección de mora',255);
+    if($loan===''||$n<1||$new===null||$new<0||$new>1000000) throw new ApiError('Importe de mora inválido.',422);
+    tx($pdo,function() use($pdo,$auth,$loan,$n,$new,$reason) {
+        $st=$pdo->prepare('SELECT c.mora,c.estado,cl.nombre AS cliente,(SELECT a.mora_nueva FROM ajustes_mora a WHERE a.prestamo_id=c.prestamo_id AND a.numero=c.numero ORDER BY a.id DESC LIMIT 1) AS mora_ajustada FROM cuotas c JOIN prestamos p ON p.id=c.prestamo_id JOIN clientes cl ON cl.id=p.cliente_id WHERE c.prestamo_id=? AND c.numero=? FOR UPDATE'); $st->execute([$loan,$n]); $c=$st->fetch();
+        if(!$c||$c['estado']!=='PAGADO') throw new ApiError('Solo puede corregir mora de cuotas ya cobradas.',409);
+        $old=(float)($c['mora_ajustada'] ?? $c['mora'] ?? 0); $pdo->prepare('INSERT INTO ajustes_mora(prestamo_id,numero,mora_anterior,mora_nueva,motivo,usuario) VALUES(?,?,?,?,?,?)')->execute([$loan,$n,$old,$new,$reason,$auth['user']]);
+        // Ledger inmutable: no se altera el pago original ni su auditoría. load_loans aplica el último ajuste al valor mostrado.
+        log_audit($pdo,'MORA_CORREGIDA',(string)$c['cliente'],(string)$n,$new-$old,'-','-',$auth['user']);
+    });
+    respond(['ok'=>true,'loan'=>load_loans($pdo,$loan)[0]]);
+}
+function do_cash_movement(PDO $pdo, array $auth): void
+{
+    $in=read_json(); $tipo=strtoupper(clean_str($in['tipo']??'',10)); $cat=clean_str($in['categoria']??'',30); $desc=clean_str($in['descripcion']??'',255); $m=num($in['monto']??null); $fecha=clean_str($in['fecha']??today(),10);
+    $cats=['APORTE','OTRO_INGRESO','GASTO_NEGOCIO','RETIRO_PERSONAL'];
+    if(!in_array($tipo,['INGRESO','EGRESO'],true)||!in_array($cat,$cats,true)||$m===null||$m<=0||!valid_date($fecha)) throw new ApiError('Datos del movimiento inválidos.',422);
+    if(($tipo==='INGRESO'&&!in_array($cat,['APORTE','OTRO_INGRESO'],true))||($tipo==='EGRESO'&&!in_array($cat,['GASTO_NEGOCIO','RETIRO_PERSONAL'],true))) throw new ApiError('La categoría no corresponde al tipo de movimiento.',422);
+    if (is_pgsql()) { $st=$pdo->prepare('INSERT INTO movimientos_caja(fecha,tipo,categoria,descripcion,monto,usuario) VALUES(?,?,?,?,?,?) RETURNING id'); $st->execute([$fecha,$tipo,$cat,$desc,round($m,2),$auth['user']]); $id=$st->fetchColumn(); }
+    else { $st=$pdo->prepare('INSERT INTO movimientos_caja(fecha,tipo,categoria,descripcion,monto,usuario) VALUES(?,?,?,?,?,?)'); $st->execute([$fecha,$tipo,$cat,$desc,round($m,2),$auth['user']]); $id=$pdo->lastInsertId(); } respond(['ok'=>true,'movement'=>['id'=>$id,'fecha'=>$fecha,'tipo'=>$tipo,'categoria'=>$cat,'descripcion'=>$desc,'monto'=>round($m,2),'usuario'=>$auth['user']]],201);
 }
 
 // ============================================================================
@@ -847,19 +962,27 @@ function split_metodo(string $metodo, string $numField): array
 
 function wipe_all(PDO $pdo): void
 {
-    if (is_pgsql()) {
+    $pgsql = is_pgsql();
+
+    if ($pgsql) {
         $pdo->exec("SET LOCAL credicochas.permitir_borrado = '1'");
     } else {
         $pdo->exec('SET @credicochas_permitir_borrado = 1');
     }
-    $pdo->exec('DELETE FROM cuotas');
-    $pdo->exec('DELETE FROM prestamos');
-    $pdo->exec('DELETE FROM clientes');
-    $pdo->exec('DELETE FROM auditoria');
-    if (is_pgsql()) {
-        $pdo->exec("SET LOCAL credicochas.permitir_borrado = ''");
-    } else {
-        $pdo->exec('SET @credicochas_permitir_borrado = NULL');
+
+    try {
+        $pdo->exec('DELETE FROM movimientos_caja');
+        $pdo->exec('DELETE FROM ajustes_mora');
+        $pdo->exec('DELETE FROM cuotas');
+        $pdo->exec('DELETE FROM prestamos');
+        $pdo->exec('DELETE FROM clientes');
+        $pdo->exec('DELETE FROM auditoria');
+    } finally {
+        if ($pgsql) {
+            $pdo->exec("SET LOCAL credicochas.permitir_borrado = ''");
+        } else {
+            $pdo->exec('SET @credicochas_permitir_borrado = NULL');
+        }
     }
 }
 
@@ -867,15 +990,18 @@ function do_import_backup(PDO $pdo, array $auth): void
 {
     $d = read_json();
     $password = is_string($d['password'] ?? null) ? $d['password'] : '';
-    if ($password !== '') {
-        verify_current_user_password($pdo, $auth, $password);
+    if ($password === '') {
+        throw new ApiError('Debes ingresar tu contraseña para importar el respaldo.', 401);
     }
+    verify_current_user_password($pdo, $auth, $password);
 
     $bad = function (string $why) {
         throw new ApiError("El archivo no es un respaldo válido de Credicocha's ($why).", 422);
     };
-    if (($d['app'] ?? '') !== 'credicochas' || !isset($d['clients'], $d['loans'], $d['auditLogs'])
-        || !is_array($d['clients']) || !is_array($d['loans']) || !is_array($d['auditLogs'])) {
+    if (($d['app'] ?? '') !== 'credicochas'
+        || !isset($d['clients'], $d['loans'], $d['auditLogs'], $d['cashMovements'], $d['moraAdjustments'])
+        || !is_array($d['clients']) || !is_array($d['loans']) || !is_array($d['auditLogs'])
+        || !is_array($d['cashMovements']) || !is_array($d['moraAdjustments'])) {
         $bad('formato');
     }
     if (count($d['clients']) > 20000 || count($d['loans']) > 50000 || count($d['auditLogs']) > 500000) {
@@ -920,7 +1046,7 @@ function do_import_backup(PDO $pdo, array $auth): void
             }
             $seen[$numero] = true;
             $row = ['numero' => $numero, 'fp' => $fp, 'monto' => $monto, 'estado' => 'PENDIENTE', 'fecha_pago' => null, 'hora' => null,
-                    'metodo' => null, 'op' => null, 'mora' => null, 'cobrado' => null, 'audit' => null, 'por' => null];
+                    'metodo' => null, 'op' => null, 'mora' => null, 'cobrado' => null, 'audit' => null, 'mora_omitida' => !empty($c['moraOmitida']), 'por' => null];
             if (($c['estado'] ?? '') === 'PAGADO') {
                 $fpago = clean_str($c['fechaPago'] ?? '', 10);
                 $mora  = num($c['mora'] ?? null) ?? 0.0;
@@ -936,7 +1062,8 @@ function do_import_backup(PDO $pdo, array $auth): void
                 $cobrado = num($c['montoCobrado'] ?? null);
                 $row['cobrado'] = ($cobrado !== null && $cobrado > 0 && $cobrado < 1e10) ? round($cobrado, 2) : round($monto + $row['mora'], 2);
                 $row['audit'] = preg_match('/^[A-Za-z0-9_-]{3,30}$/', $audit) ? $audit : null;
-                $row['por'] = $auth['user'];
+                $cobrador = clean_str($c['cobradoPor'] ?? '', 50);
+                $row['por'] = $cobrador !== '' ? $cobrador : $auth['user'];
             } else {
                 $allPaid = false;
             }
@@ -961,28 +1088,135 @@ function do_import_backup(PDO $pdo, array $auth): void
         $monto = num($a['monto'] ?? null) ?? 0.0;
         $evento = clean_str($a['evento'] ?? '', 40);
         $audits[] = [$id, $ts, substr($ts, 0, 10), clean_str($a['cliente'] ?? '-', 150) ?: '-', $evento === '' ? 'EVENTO' : $evento,
-                     clean_str($a['cuotaNum'] ?? '-', 20) ?: '-', ($monto >= 0 && $monto < 1e10) ? round($monto, 2) : 0.0, $metodo, $op, $auth['user']];
+                     clean_str($a['cuotaNum'] ?? '-', 20) ?: '-', ($monto >= 0 && $monto < 1e10) ? round($monto, 2) : 0.0, $metodo, $op, (clean_str($a['usuario'] ?? '', 50) ?: $auth['user'])];
     }
 
-    tx($pdo, function () use ($pdo, $clients, $loans, $audits) {
+    foreach ($loans as $l) {
+        foreach ($l['cuotas'] as $c) {
+            if ($c['estado'] === 'PAGADO'
+                && $c['audit'] !== null
+                && !isset($auditIds[$c['audit']])) {
+                $bad("auditoría inexistente en cuota {$c['numero']} del préstamo {$l['id']}");
+            }
+        }
+    }
+
+    $cashData = $d['cashMovements'];
+    $moraData = $d['moraAdjustments'];
+
+    if (!is_array($cashData) || !is_array($moraData)) {
+        $bad('movimientos de caja o ajustes de mora');
+    }
+
+    if (count($cashData) > 100000 || count($moraData) > 100000) {
+        $bad('demasiados movimientos o ajustes');
+    }
+
+    $cashMovements = [];
+    $cashIds = [];
+    foreach ($cashData as $m) {
+        if (!is_array($m)) $bad('movimiento de caja');
+
+        $id = clean_str($m['id'] ?? '', 20);
+        $fecha = clean_str($m['fecha'] ?? '', 10);
+        $tipo = strtoupper(clean_str($m['tipo'] ?? '', 10));
+        $categoria = clean_str($m['categoria'] ?? '', 30);
+        $descripcion = clean_str($m['descripcion'] ?? '', 255);
+        $monto = num($m['monto'] ?? null);
+        $usuario = clean_str($m['usuario'] ?? '', 50);
+        $creado = clean_str($m['creado_en'] ?? '', 30);
+
+        if (!preg_match('/^[1-9]\d{0,17}$/', $id)
+            || isset($cashIds[$id])
+            || !valid_date($fecha)
+            || !in_array($tipo, ['INGRESO', 'EGRESO'], true)
+            || $categoria === ''
+            || $monto === null || $monto <= 0 || $monto >= 1e10
+            || $usuario === ''
+            || $creado === '' || strtotime($creado) === false) {
+            $bad("movimiento de caja $id");
+        }
+
+        $cashIds[$id] = true;
+        $cashMovements[] = [(int)$id, $fecha, $tipo, $categoria, $descripcion,
+                            round($monto, 2), $usuario, $creado];
+    }
+
+    $cuotasValidas = [];
+    foreach ($loans as $l) {
+        foreach ($l['cuotas'] as $c) {
+            $cuotasValidas[$l['id'] . ':' . $c['numero']] = true;
+        }
+    }
+
+    $moraAdjustments = [];
+    $moraIds = [];
+    foreach ($moraData as $a) {
+        if (!is_array($a)) $bad('ajuste de mora');
+
+        $id = clean_str($a['id'] ?? '', 20);
+        $prestamo = clean_str($a['prestamo_id'] ?? '', 20);
+        $numero = isset($a['numero']) && is_numeric($a['numero']) ? (int)$a['numero'] : 0;
+        $anterior = num($a['mora_anterior'] ?? null);
+        $nueva = num($a['mora_nueva'] ?? null);
+        $motivo = clean_str($a['motivo'] ?? '', 255);
+        $usuario = clean_str($a['usuario'] ?? '', 50);
+        $creado = clean_str($a['creado_en'] ?? '', 30);
+
+        if (!preg_match('/^[1-9]\d{0,17}$/', $id)
+            || isset($moraIds[$id])
+            || !isset($loanIds[$prestamo])
+            || $numero < 1 || !isset($cuotasValidas[$prestamo . ':' . $numero])
+            || $anterior === null || $anterior < 0 || $anterior >= 1e8
+            || $nueva === null || $nueva < 0 || $nueva >= 1e8
+            || $usuario === ''
+            || $creado === '' || strtotime($creado) === false) {
+            $bad("ajuste de mora $id");
+        }
+
+        $moraIds[$id] = true;
+        $moraAdjustments[] = [(int)$id, $prestamo, $numero,
+                              round($anterior, 2), round($nueva, 2),
+                              $motivo, $usuario, $creado];
+    }
+
+    tx($pdo, function () use ($pdo, $clients, $loans, $audits, $cashMovements, $moraAdjustments, $auth) {
         wipe_all($pdo);
         $st = $pdo->prepare('INSERT INTO clientes (id, nombre, dni, telefono, direccion) VALUES (?,?,?,?,?)');
         foreach ($clients as $r) $st->execute($r);
 
         $sl = $pdo->prepare('INSERT INTO prestamos (id, cliente_id, capital, interes_pct, total_pagar, cuotas_count, frecuencia, fecha_inicio, omitir_domingos, estado)
                              VALUES (?,?,?,?,?,?,?,?,?,?)');
-        $sc = $pdo->prepare('INSERT INTO cuotas (prestamo_id, numero, fecha_programada, monto, estado, fecha_pago, hora_pago, metodo_pago, num_operacion, mora, monto_cobrado, audit_id, cobrado_por)
-                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $sc = $pdo->prepare('INSERT INTO cuotas (prestamo_id, numero, fecha_programada, monto, estado, fecha_pago, hora_pago, metodo_pago, num_operacion, mora, monto_cobrado, audit_id, mora_omitida, cobrado_por)
+                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         foreach ($loans as $l) {
             $sl->execute([$l['id'], $l['cid'], $l['capital'], $l['interes'], $l['total'], count($l['cuotas']), $l['frec'], $l['inicio'], $l['omitir'] ? 1 : 0, $l['estado']]);
             foreach ($l['cuotas'] as $c) {
-                $sc->execute([$l['id'], $c['numero'], $c['fp'], $c['monto'], $c['estado'], $c['fecha_pago'], $c['hora'], $c['metodo'], $c['op'], $c['mora'], $c['cobrado'], $c['audit'], $c['por']]);
+                $sc->execute([$l['id'], $c['numero'], $c['fp'], $c['monto'], $c['estado'], $c['fecha_pago'], $c['hora'], $c['metodo'], $c['op'], $c['mora'], $c['cobrado'], $c['audit'], $c['mora_omitida'], $c['por']]);
             }
         }
         $sa = $pdo->prepare('INSERT INTO auditoria (id, fecha_hora, fecha, cliente, evento, cuota_num, monto, metodo, num_operacion, usuario) VALUES (?,?,?,?,?,?,?,?,?,?)');
         foreach ($audits as $r) $sa->execute($r);
+
+        $sm = $pdo->prepare('INSERT INTO movimientos_caja
+            (id, fecha, tipo, categoria, descripcion, monto, usuario, creado_en)
+            VALUES (?,?,?,?,?,?,?,?)');
+        foreach ($cashMovements as $r) $sm->execute($r);
+
+        $saj = $pdo->prepare('INSERT INTO ajustes_mora
+            (id, prestamo_id, numero, mora_anterior, mora_nueva, motivo, usuario, creado_en)
+            VALUES (?,?,?,?,?,?,?,?)');
+        foreach ($moraAdjustments as $r) $saj->execute($r);
+
+        if (is_pgsql()) {
+            $pdo->query("SELECT setval(pg_get_serial_sequence('movimientos_caja','id'),
+                COALESCE(MAX(id),1), COUNT(*) > 0) FROM movimientos_caja");
+            $pdo->query("SELECT setval(pg_get_serial_sequence('ajustes_mora','id'),
+                COALESCE(MAX(id),1), COUNT(*) > 0) FROM ajustes_mora");
+        }
+
+        log_audit($pdo, 'RESPALDO_IMPORTADO', '-', '-', 0, '-', '-', $auth['user']);
     });
-    log_audit($pdo, 'RESPALDO_IMPORTADO', '-', '-', 0, '-', '-', $auth['user']);
     respond(['ok' => true, 'clients' => count($clients), 'loans' => count($loans)]);
 }
 
@@ -993,12 +1227,15 @@ function do_reset(PDO $pdo, array $auth): void
         throw new ApiError('Confirmación inválida.', 422);
     }
     $password = is_string($in['password'] ?? null) ? $in['password'] : '';
-    if ($password !== '') {
-        verify_current_user_password($pdo, $auth, $password);
+    if ($password === '') {
+        throw new ApiError('Debes ingresar tu contraseña para reiniciar el sistema.', 401);
     }
+    verify_current_user_password($pdo, $auth, $password);
 
-    tx($pdo, function () use ($pdo) { wipe_all($pdo); });
-    log_audit($pdo, 'SISTEMA_REINICIADO', '-', '-', 0, '-', '-', $auth['user']);
+    tx($pdo, function () use ($pdo, $auth) {
+        wipe_all($pdo);
+        log_audit($pdo, 'SISTEMA_REINICIADO', '-', '-', 0, '-', '-', $auth['user']);
+    });
     respond(['ok' => true]);
 }
 
@@ -1027,6 +1264,8 @@ try {
         ]);
     }
     $pdo = db();
+    ensure_schema($pdo);
+    ensure_feature_schema($pdo);
 
     switch ($action) {
         case 'session':
@@ -1041,6 +1280,10 @@ try {
             do_bootstrap($pdo);
         case 'logout':
         case 'create_client':
+        case 'update_client':
+        case 'omit_mora':
+        case 'adjust_mora':
+        case 'cash_movement':
         case 'create_loan':
         case 'pay':
         case 'change_password':
@@ -1057,6 +1300,10 @@ try {
             }
             switch ($action) {
                 case 'create_client':   do_create_client($pdo, $auth);
+                case 'update_client':   do_update_client($pdo, $auth);
+                case 'omit_mora':       do_omit_mora($pdo, $auth);
+                case 'adjust_mora':     do_adjust_mora($pdo, $auth);
+                case 'cash_movement':   do_cash_movement($pdo, $auth);
                 case 'create_loan':     do_create_loan($pdo, $auth);
                 case 'pay':             do_pay($pdo, $auth);
                 case 'change_password': do_change_password($pdo, $auth);
