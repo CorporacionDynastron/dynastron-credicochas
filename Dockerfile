@@ -35,9 +35,5 @@ RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type d -exec chmod 750 {} \; \
     && find /var/www/html -type f -exec chmod 640 {} \;
 
-# Demonio interno de auto-ping (cada 8 min hacia la URL pública para evitar suspensión en Render Free)
-RUN printf '#!/bin/sh\n(while true; do sleep 480; curl -fsS -m 15 "https://credicochas.dynastron.com/api.php?action=ping" >/dev/null 2>&1 || true; curl -fsS -m 15 "https://dynastron-credicochas.onrender.com/api.php?action=ping" >/dev/null 2>&1 || true; done) &\nexec apache2-foreground\n' > /usr/local/bin/start-credicochas.sh \
-    && chmod +x /usr/local/bin/start-credicochas.sh
-
 EXPOSE 80
-CMD ["/usr/local/bin/start-credicochas.sh"]
+CMD ["apache2-foreground"]
