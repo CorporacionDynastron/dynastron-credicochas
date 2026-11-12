@@ -1434,10 +1434,14 @@ $sumaCuotasCentavos = 0;
         $bad('demasiados movimientos o ajustes');
     }
 
+
     $cashMovements = [];
     $cashIds = [];
+
     foreach ($cashData as $m) {
-        if (!is_array($m)) $bad('movimiento de caja');
+        if (!is_array($m)) {
+            $bad('movimiento de caja');
+        }
 
         $id = clean_str($m['id'] ?? '', 20);
         $fecha = clean_str($m['fecha'] ?? '', 10);
@@ -1448,21 +1452,36 @@ $sumaCuotasCentavos = 0;
         $usuario = clean_str($m['usuario'] ?? '', 50);
         $creado = clean_str($m['creado_en'] ?? '', 30);
 
-       if (!preg_match('/^[1-9]\d{0,17}$/', $id)
-    || isset($cashIds[$id])
-    || !valid_date($fecha)
-    || !in_array($tipo, ['INGRESO', 'EGRESO'], true)
-    || !in_array($categoria, ['APORTE', 'OTRO_INGRESO', 'GASTO_NEGOCIO', 'RETIRO_PERSONAL'], true)
-    || ($tipo === 'INGRESO' && !in_array($categoria, ['APORTE', 'OTRO_INGRESO'], true))
-    || ($tipo === 'EGRESO' && !in_array($categoria, ['GASTO_NEGOCIO', 'RETIRO_PERSONAL'], true))
-    || $monto === null || $monto <= 0 || $monto >= 1e10
-    || $usuario === ''
-    || $creado === '' || strtotime($creado) === false) {
+        if (
+            !preg_match('/^[1-9]\d{0,17}$/', $id)
+            || isset($cashIds[$id])
+            || !valid_date($fecha)
+            || !in_array($tipo, ['INGRESO', 'EGRESO'], true)
+            || !in_array($categoria, ['APORTE', 'OTRO_INGRESO', 'GASTO_NEGOCIO', 'RETIRO_PERSONAL'], true)
+            || ($tipo === 'INGRESO' && !in_array($categoria, ['APORTE', 'OTRO_INGRESO'], true))
+            || ($tipo === 'EGRESO' && !in_array($categoria, ['GASTO_NEGOCIO', 'RETIRO_PERSONAL'], true))
+            || $monto === null || $monto <= 0 || $monto >= 1e10
+            || $usuario === ''
+            || $creado === '' || strtotime($creado) === false
+        ) {
+            $bad("movimiento de caja $id");
+        }
 
         $cashIds[$id] = true;
-        $cashMovements[] = [(int)$id, $fecha, $tipo, $categoria, $descripcion,
-                            round($monto, 2), $usuario, $creado];
+
+        $cashMovements[] = [
+            (int) $id,
+            $fecha,
+            $tipo,
+            $categoria,
+            $descripcion,
+            round($monto, 2),
+            $usuario,
+            $creado
+        ];
     }
+
+
 
 $cuotasValidas = [];
 
