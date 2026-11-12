@@ -213,12 +213,18 @@ function db(): PDO
         throw new DbConnectionError('No se pudo conectar a la base de datos.');
     }
 
-    $offset = (new DateTimeImmutable('now', $tz))->format('P');
-    if ($driver === 'pgsql') {
-        $pdo->exec("SET TIME ZONE '" . $offset . "'");
-        $pdo->exec("SET client_encoding TO 'UTF8'");
-    } else {
-        $pdo->exec("SET time_zone = '" . $offset . "'");
+    try {
+        $offset = (new DateTimeImmutable('now', $tz))->format('P');
+
+        if ($driver === 'pgsql') {
+            $pdo->exec("SET TIME ZONE '" . $offset . "'");
+            $pdo->exec("SET client_encoding TO 'UTF8'");
+        } else {
+            $pdo->exec("SET time_zone = '" . $offset . "'");
+        }
+    } catch (PDOException $e) {
+        error_log('[credicochas] Error configurando la conexión (' . $driver . '): ' . $e->getMessage());
+        throw new DbConnectionError('La conexión se estableció, pero no se pudo configurar correctamente.');
     }
 
     return $pdo;

@@ -20,3 +20,23 @@ CGIPassAuth On
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 </IfModule>
+
+
+# ==========================================
+# CACHE INTELIGENTE - CREDICOCHA'S
+# ==========================================
+
+<IfModule mod_headers.c>
+
+  # HTML: comprobar siempre si existe una versión nueva
+  <FilesMatch "\.(html|htm)$">
+    Header always set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Recursos estáticos: caché de 24 horas
+  <FilesMatch "\.(css|js|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf)$">
+    Header always set Cache-Control "public, max-age=86400, must-revalidate"
+  </FilesMatch>
+
+</IfModule>
+

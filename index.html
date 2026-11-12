@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS: exportación XLSX real con hojas separadas -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
     <!-- Custom Tailwind Configuration -->
     <script>
         tailwind.config = {
@@ -161,7 +163,7 @@
                 <div class="min-w-0">
                     <h1 class="font-black text-sm sm:text-lg text-white tracking-wider flex items-center space-x-1.5">
                         <span class="truncate">CREDICOCHA'S</span>
-                        <span class="bg-cyan-950 text-cyan-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 font-mono shrink-0">v3.0</span>
+                        <span class="bg-cyan-950 text-cyan-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 font-mono shrink-0">v3.2</span>
                     </h1>
                     <p class="text-[10px] sm:text-xs text-slate-400 truncate">Control de Cobranza & Auditoría</p>
                 </div>
@@ -228,6 +230,9 @@
                 <i class="fa-solid fa-file-excel text-emerald-400"></i>
                 <span>Exportar Excel</span>
             </button>
+            <button onclick="switchTab('caja')" id="tab-caja" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 text-slate-400 hover:text-cyan-400 hover:bg-dark-800 transition">
+                <i class="fa-solid fa-wallet text-amber-400"></i><span>Caja / Finanzas</span>
+            </button>
             <button onclick="switchTab('auditoria')" id="tab-auditoria" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 text-slate-400 hover:text-cyan-400 hover:bg-dark-800 transition">
                 <i class="fa-solid fa-shield-halved"></i>
                 <span>Bitácora de Auditoría</span>
@@ -253,6 +258,9 @@
             <button onclick="switchTab('reportes')" id="mob-tab-reportes" class="mob-tab-btn flex flex-col items-center text-slate-400 font-medium">
                 <i class="fa-solid fa-file-excel text-lg text-emerald-400"></i>
                 <span class="text-[9px] mt-0.5">Excel</span>
+            </button>
+            <button onclick="switchTab('caja')" id="mob-tab-caja" class="mob-tab-btn flex flex-col items-center text-slate-400 font-medium">
+                <i class="fa-solid fa-wallet text-lg text-amber-400"></i><span class="text-[9px] mt-0.5">Caja</span>
             </button>
             <button onclick="switchTab('auditoria')" id="mob-tab-auditoria" class="mob-tab-btn flex flex-col items-center text-slate-400 font-medium">
                 <i class="fa-solid fa-shield-halved text-lg"></i>
@@ -628,9 +636,9 @@
                 <div class="border-b border-dark-700 pb-3">
                     <h3 class="text-base sm:text-lg font-bold text-emerald-400 flex items-center space-x-2">
                         <i class="fa-solid fa-file-excel"></i>
-                        <span>Exportar Reporte de Ingresos a Excel</span>
+                        <span>Reportes financieros y exportación</span>
                     </h3>
-                    <p class="text-xs text-slate-400 mt-1">Descargar la lista completa de cuotas cobradas con método de pago (Yape, Plin, Efectivo, Transferencia) y N° de operación.</p>
+                    <p class="text-xs text-slate-400 mt-1">Genera un libro organizado con resumen, cobros reales, movimientos de caja y correcciones de mora. Los ajustes no alteran el importe histórico que efectivamente ingresó.</p>
                 </div>
 
                 <form onsubmit="handleExportExcel(event)" class="space-y-4">
@@ -646,16 +654,15 @@
                     </div>
 
                     <div class="bg-dark-950 p-3.5 rounded-xl border border-dark-700 space-y-2 text-xs">
-                        <span class="text-slate-400 font-bold block">Campos incluidos en el reporte generado:</span>
+                        <span class="text-slate-400 font-bold block">El archivo Excel contiene hojas separadas:</span>
                         <ul class="list-disc list-inside text-slate-400 grid grid-cols-1 sm:grid-cols-2 gap-1 font-mono text-[10px] sm:text-[11px]">
-                            <li>Fecha y Hora de Pago</li>
-                            <li>Cliente y DNI</li>
-                            <li>ID de Préstamo</li>
-                            <li>Número de Cuota</li>
-                            <li>Monto Cuota, Mora y Total Cobrado (S/)</li>
-                            <li>Método (Yape/Plin/Efectivo)</li>
-                            <li>N° Operación / Referencia</li>
-                            <li>ID Transacción Auditoría</li>
+                            <li>Resumen financiero del periodo</li>
+                            <li>Cobros reales con mora vigente y ajuste</li>
+                            <li>Movimientos de caja: ingresos y egresos</li>
+                            <li>Desembolsos de préstamos</li>
+                            <li>Historial de correcciones de mora</li>
+                            <li>Cliente, DNI, método y referencia de pago</li>
+                            <li>Totales, filtros y encabezados organizados</li>
                         </ul>
                     </div>
 
@@ -665,6 +672,28 @@
                     </button>
                 </form>
             </div>
+        </div>
+
+        <!-- TAB CAJA / FINANZAS -->
+        <div id="view-caja" class="tab-content hidden space-y-4 sm:space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="bg-dark-800 p-4 rounded-2xl border border-dark-700"><p class="text-xs text-slate-400">Ingresos (cobros + otros)</p><h3 id="cash-income" class="text-2xl font-black text-emerald-400">S/ 0.00</h3></div>
+                <div class="bg-dark-800 p-4 rounded-2xl border border-dark-700"><p class="text-xs text-slate-400">Egresos y retiros</p><h3 id="cash-expense" class="text-2xl font-black text-rose-400">S/ 0.00</h3></div>
+                <div class="bg-dark-800 p-4 rounded-2xl border border-dark-700"><p class="text-xs text-slate-400">Flujo neto acumulado*</p><h3 id="cash-balance" class="text-2xl font-black text-cyan-400">S/ 0.00</h3></div>
+            </div>
+            <div id="cash-breakdown" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs"></div>
+            <div class="bg-dark-800 p-4 sm:p-5 rounded-2xl border border-dark-700">
+                <h3 class="font-bold text-white mb-3">Registrar movimiento</h3>
+                <form id="cash-form" onsubmit="handleCashMovement(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <select id="cash-type" onchange="updateCashCategories()" class="bg-dark-700 border border-dark-600 rounded-xl p-2.5 text-xs text-white"><option value="INGRESO">Ingreso</option><option value="EGRESO">Egreso</option></select>
+                    <select id="cash-category" class="bg-dark-700 border border-dark-600 rounded-xl p-2.5 text-xs text-white"><option value="APORTE">Aporte</option><option value="OTRO_INGRESO">Otro ingreso</option></select>
+                    <input id="cash-amount" type="number" min="0.01" step="0.01" required placeholder="Monto S/" class="bg-dark-700 border border-dark-600 rounded-xl p-2.5 text-xs text-white">
+                    <input id="cash-date" type="date" required class="bg-dark-700 border border-dark-600 rounded-xl p-2.5 text-xs text-white">
+                    <input id="cash-description" maxlength="255" placeholder="Descripción" class="bg-dark-700 border border-dark-600 rounded-xl p-2.5 text-xs text-white">
+                    <button class="sm:col-span-2 lg:col-span-5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-xl p-3 text-xs">GUARDAR MOVIMIENTO</button>
+                </form>
+            </div>
+            <div class="bg-dark-800 p-4 rounded-2xl border border-dark-700 overflow-x-auto"><h3 class="font-bold text-white mb-3">Historial de caja</h3><table class="w-full text-left text-xs"><thead><tr class="text-slate-400"><th class="p-2">Fecha</th><th class="p-2">Tipo</th><th class="p-2">Categoría</th><th class="p-2">Descripción</th><th class="p-2">Monto</th></tr></thead><tbody id="cash-table"></tbody></table><p class="text-[10px] text-slate-500 mt-2">*El flujo neto incluye cobros reales, desembolsos de préstamos y movimientos manuales; no representa el saldo bancario inicial.</p></div>
         </div>
 
         <!-- TAB 5: AUDITORÍA -->
@@ -707,10 +736,48 @@
 
     <!-- FOOTER -->
     <footer class="bg-dark-900 border-t border-dark-700 py-3 sm:py-4 text-center text-[10px] sm:text-xs text-slate-500 font-mono">
-        <p>© CREDICOCHA'S v3.0 — Control Profesional de Cobranzas y Auditoría.</p>
+        <p>© CREDICOCHA'S v3.2 — Control Profesional de Cobranzas y Auditoría.</p>
     </footer>
 
     <!-- MODAL 1: CRONOGRAMA DE CUOTAS DEL CLIENTE (MOBILE OPTIMIZED) -->
+    <!-- MODAL: PERFIL DETALLADO DEL CLIENTE -->
+    <div id="modal-client-profile" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden overflow-y-auto z-[60] p-2 sm:p-4">
+        <div class="w-full max-w-5xl mx-auto my-4 bg-dark-900 border border-cyan-500/30 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-4 sm:p-6 border-b border-dark-700 flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-[10px] uppercase tracking-[.25em] text-cyan-400 font-black">Ficha del cliente</p>
+                    <h2 id="profile-client-name" class="text-xl sm:text-2xl font-black text-white mt-1">Cliente</h2>
+                    <p id="profile-client-meta" class="text-xs text-slate-400 mt-1"></p>
+                </div>
+                <button onclick="closeModal('modal-client-profile')" class="shrink-0 px-3 py-2 rounded-lg bg-dark-700 text-slate-300 hover:text-white" aria-label="Cerrar perfil"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 sm:p-6 space-y-5">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3" id="profile-kpis"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <section class="rounded-xl border border-dark-700 bg-dark-800 p-4">
+                        <h3 class="text-sm font-bold text-cyan-300 mb-3">Datos personales</h3>
+                        <dl id="profile-client-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></dl>
+                    </section>
+                    <section class="rounded-xl border border-dark-700 bg-dark-800 p-4">
+                        <h3 class="text-sm font-bold text-emerald-300 mb-3">Resumen de cartera</h3>
+                        <div id="profile-finance-summary" class="space-y-2 text-xs"></div>
+                    </section>
+                </div>
+                <section class="rounded-xl border border-dark-700 bg-dark-800 p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                        <h3 class="text-sm font-bold text-white">Historial de préstamos</h3>
+                        <button id="profile-new-loan" class="px-3 py-2 rounded-lg bg-emerald-500 text-slate-950 text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Nuevo préstamo</button>
+                    </div>
+                    <div id="profile-loans-list" class="space-y-3"></div>
+                </section>
+                <div class="flex flex-col sm:flex-row gap-2 justify-end">
+                    <button id="profile-edit-client" class="px-4 py-2 rounded-lg bg-amber-400 text-slate-950 font-black text-xs">Editar datos del cliente</button>
+                    <button onclick="closeModal('modal-client-profile')" class="px-4 py-2 rounded-lg bg-dark-700 text-white font-bold text-xs">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-schedule" class="fixed inset-0 bg-black/85 backdrop-blur-sm hidden overflow-y-auto z-50 p-2 sm:p-4">
         <div class="bg-dark-800 border border-dark-600 rounded-2xl max-w-4xl w-full mx-auto my-auto p-4 sm:p-6 shadow-2xl relative flex flex-col h-[95vh] h-[95dvh] sm:h-auto sm:max-h-[90vh]">
             <button onclick="closeModal('modal-schedule')" class="absolute top-3 right-3 text-slate-400 hover:text-white p-2">
@@ -928,7 +995,7 @@
         let clockOffsetMs = 0;        // diferencia entre el reloj del servidor y el del dispositivo
         let csrfToken = '';
         let sessionToken = sessionStorage.getItem(TOKEN_STORAGE_KEY) || '';
-        let clients = [], loans = [], auditLogs = [];
+        let clients = [], loans = [], auditLogs = [], cashMovements = [], moraAdjustments = [];
         let financialChartInstance = null;
         let statusChartInstance = null;
         let activeModalLoanId = null;
@@ -937,7 +1004,7 @@
         function esc(v) { return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
         function moraDeCuota(c) {
             if (c.estado === 'PAGADO') return c.mora || 0;
-            return c.fechaProgramada < hoyISO() ? MORA_FEE : 0;
+            return c.fechaProgramada < hoyISO() && !c.moraOmitida ? MORA_FEE : 0;
         }
         function montoTotalCuota(c) { return round2(c.monto + moraDeCuota(c)); }
         function moraTag(c) {
@@ -1065,7 +1132,7 @@
         }
         async function loadAll() {
             const d = await api('bootstrap');
-            clients = d.clients || []; loans = d.loans || []; auditLogs = d.auditLogs || [];
+            clients = d.clients || []; loans = d.loans || []; auditLogs = d.auditLogs || []; cashMovements = d.cashMovements || []; moraAdjustments = d.moraAdjustments || [];
             if (d.moraFee != null) MORA_FEE = Number(d.moraFee);
             populateClientSelect();
             updateBadges();
@@ -1075,6 +1142,7 @@
             document.getElementById('login-error').classList.add('hidden');
             document.getElementById('login-screen').classList.add('hidden');
             const hoy = hoyISO();
+            const cashDate=document.getElementById('cash-date'); if(cashDate) cashDate.value=hoy;
             const expFrom = document.getElementById('export-date-from'); if (expFrom) expFrom.value = hoy;
             const expTo = document.getElementById('export-date-to'); if (expTo) expTo.value = hoy;
             const dateDisplay = document.getElementById('today-date-display');
@@ -1284,97 +1352,167 @@
             if (tabId === 'clientes') { populateClientSelect(); renderClientsTable(); setDefaultLoanDate(); calculateLoanPreview(); }
             if (tabId === 'cobros-hoy') renderTodayInstallments();
             if (tabId === 'auditoria') renderAuditTable();
+            if (tabId === 'caja') renderCash();
         }
 
         // Render Clients Table & Mobile View Cards
+        // Render de cartera: una fila por cliente y préstamos desplegables.
         function renderClientsTable() {
             const tbody = document.getElementById('table-clients-body');
             const mobList = document.getElementById('mobile-clients-list');
-            const search = document.getElementById('search-client').value.toLowerCase();
+            const search = document.getElementById('search-client').value.toLowerCase().trim();
             const filter = document.getElementById('filter-status').value;
-            
+
             tbody.innerHTML = '';
             mobList.innerHTML = '';
 
-            let filtered = loans.filter(l => {
-                const cliente = clients.find(c => c.id === l.clienteId) || {};
-                const matchesSearch = cliente.nombre?.toLowerCase().includes(search) || cliente.dni?.includes(search);
-                const matchesFilter = filter === 'ALL' || l.estado === filter;
-                return matchesSearch && matchesFilter;
+            // Primero agrupamos todos los préstamos que cumplen el filtro.
+            const grupos = new Map();
+            if (filter === 'ALL') {
+                clients.forEach(cliente => {
+                    const nombre = String(cliente.nombre || '').toLowerCase();
+                    const dni = String(cliente.dni || '').toLowerCase();
+                    if (!search || nombre.includes(search) || dni.includes(search)) {
+                        grupos.set(String(cliente.id), { cliente, prestamos: [] });
+                    }
+                });
+            }
+            loans.forEach(loan => {
+                const cliente = clients.find(c => String(c.id) === String(loan.clienteId));
+                if (!cliente) return;
+
+                const nombre = String(cliente.nombre || '').toLowerCase();
+                const dni = String(cliente.dni || '').toLowerCase();
+                const coincideBusqueda = !search || nombre.includes(search) || dni.includes(search);
+                const coincideEstado = filter === 'ALL' || loan.estado === filter;
+                if (!coincideBusqueda || !coincideEstado) return;
+
+                const key = String(cliente.id);
+                if (!grupos.has(key)) grupos.set(key, { cliente, prestamos: [] });
+                grupos.get(key).prestamos.push(loan);
             });
 
-            document.getElementById('client-count').innerText = `${filtered.length} Registros`;
+            const lista = Array.from(grupos.values());
+            document.getElementById('client-count').innerText = `${lista.length} Clientes`;
 
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se encontraron préstamos</td></tr>`;
-                mobList.innerHTML = `<div class="p-4 text-center text-slate-500 bg-dark-900 rounded-xl border border-dark-700 text-xs">No se encontraron préstamos</div>`;
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se encontraron clientes</td></tr>`;
+                mobList.innerHTML = `<div class="p-4 text-center text-slate-500 bg-dark-900 rounded-xl border border-dark-700 text-xs">No se encontraron clientes</div>`;
                 return;
             }
 
-            filtered.forEach(l => {
-                const cliente = clients.find(c => c.id === l.clienteId) || { nombre: 'Desconocido', dni: '-' };
-                const pagadasCount = l.cuotas.filter(c => c.estado === 'PAGADO').length;
-                const pagadoMonto = l.cuotas.filter(c => c.estado === 'PAGADO').reduce((acc, c) => acc + c.monto, 0);
-                const saldoRestante = l.totalPagar - pagadoMonto;
+            lista.forEach(({ cliente, prestamos }) => {
+                const key = String(cliente.id);
+                const totalDeuda = prestamos.reduce((sum, l) => sum + Number(l.totalPagar || 0), 0);
+                const totalCapital = prestamos.reduce((sum, l) => sum + Number(l.capital || 0), 0);
+                const totalCuotas = prestamos.reduce((sum, l) => sum + (l.cuotas || []).length, 0);
+                const cuotasPagadas = prestamos.reduce((sum, l) => sum + (l.cuotas || []).filter(c => c.estado === 'PAGADO').length, 0);
+                const saldoRestante = prestamos.reduce((sum, l) => sum + (l.cuotas || [])
+                    .filter(c => c.estado !== 'PAGADO')
+                    .reduce((sub, c) => sub + Number(c.monto || 0), 0), 0);
+                const activos = prestamos.filter(l => l.estado === 'ACTIVO').length;
+                const estadoCliente = activos > 0 ? 'ACTIVO' : (prestamos.length ? 'PAGADO' : 'SIN PRÉSTAMOS');
 
-                // Desktop Row
+                const filasPrestamos = prestamos.map(l => {
+                    const cuotas = l.cuotas || [];
+                    const pagadas = cuotas.filter(c => c.estado === 'PAGADO').length;
+                    const saldo = cuotas.filter(c => c.estado !== 'PAGADO')
+                        .reduce((sum, c) => sum + Number(c.monto || 0), 0);
+                    return `
+                        <tr class="border-t border-dark-700 hover:bg-dark-700/40 transition">
+                            <td class="p-3">
+                                <div class="font-bold text-cyan-400">${esc(l.id)}</div>
+                                <div class="text-[10px] text-slate-400">Inicio: ${esc(l.fechaInicio || '-')}</div>
+                            </td>
+                            <td class="p-3"><span class="bg-dark-700 px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">${esc(l.frecuencia || '-')}</span></td>
+                            <td class="p-3 font-mono text-white font-bold">S/ ${Number(l.totalPagar || 0).toFixed(2)}</td>
+                            <td class="p-3 font-mono"><span class="text-emerald-400 font-bold">${pagadas}</span> / <span class="text-slate-400">${cuotas.length}</span></td>
+                            <td class="p-3 font-mono font-bold text-cyan-400">S/ ${saldo.toFixed(2)}</td>
+                            <td class="p-3 text-right">
+                                <button onclick="openScheduleModal('${esc(l.id)}')" class="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold rounded-lg text-xs shadow-neon-cyan transition">
+                                    <i class="fa-solid fa-list-check mr-1"></i> Ver Cuotas
+                                </button>
+                            </td>
+                        </tr>`;
+                }).join('');
+
+                // Escritorio: registro principal del cliente + fila expandible.
                 tbody.innerHTML += `
-                    <tr class="hover:bg-dark-700/40 transition">
+                    <tr class="hover:bg-dark-700/40 transition border-b border-dark-700">
                         <td class="p-3">
-                            <div class="font-bold text-white text-xs">${esc(cliente.nombre)}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">DNI: ${esc(cliente.dni)}</div>
+                            <div class="font-bold text-white text-xs">${esc(cliente.nombre || 'Sin nombre')}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">DNI: ${esc(cliente.dni || '-')}</div>
+                            <div class="text-[10px] text-slate-500">${esc(cliente.telefono || 'Sin teléfono')} · ${esc(cliente.direccion || 'Sin dirección')}</div>
+                            <div class="text-[10px] text-cyan-400 mt-1">${prestamos.length} préstamo(s)</div>
                         </td>
-                        <td class="p-3"><span class="bg-dark-700 px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">${l.frecuencia}</span></td>
-                        <td class="p-3 font-mono">
-                            <div class="text-white font-bold">S/ ${l.totalPagar.toFixed(2)}</div>
-                            <div class="text-[10px] text-slate-400">Cap: S/ ${l.capital.toFixed(2)}</div>
-                        </td>
-                        <td class="p-3 font-mono">
-                            <span class="text-emerald-400 font-bold">${pagadasCount}</span> / <span class="text-slate-400">${l.cuotasCount}</span>
-                        </td>
+                        <td class="p-3"><span class="bg-dark-700 px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">${prestamos.length ? activos + " activo(s)" : "Sin préstamos"}</span></td>
+                        <td class="p-3 font-mono"><div class="text-white font-bold">S/ ${totalDeuda.toFixed(2)}</div><div class="text-[10px] text-slate-400">Cap: S/ ${totalCapital.toFixed(2)}</div></td>
+                        <td class="p-3 font-mono"><span class="text-emerald-400 font-bold">${cuotasPagadas}</span> / <span class="text-slate-400">${totalCuotas}</span></td>
                         <td class="p-3 font-mono font-bold text-cyan-400">S/ ${saldoRestante.toFixed(2)}</td>
                         <td class="p-3 text-right">
-                            <button onclick="openScheduleModal('${l.id}')" class="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold rounded-lg text-xs shadow-neon-cyan transition">
-                                <i class="fa-solid fa-list-check mr-1"></i> Ver Cuotas
+                            <button onclick="toggleClientLoans('${esc(key)}')" class="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold rounded-lg text-xs shadow-neon-cyan transition">
+                                <i class="fa-solid fa-chevron-down mr-1"></i> Ver ${prestamos.length} préstamo(s)
                             </button>
+                            <div class="flex justify-end gap-2 mt-1"><button onclick="openClientProfile('${esc(key)}')" class="text-[10px] text-cyan-300 underline">Ver perfil</button><button onclick="editClient('${esc(key)}')" class="text-[10px] text-amber-300 underline">Editar datos</button><button onclick="newLoanForClient('${esc(key)}')" class="text-[10px] text-emerald-300 underline">Nuevo préstamo</button></div>
                         </td>
                     </tr>
-                `;
-
-                // Mobile Card
-                mobList.innerHTML += `
-                    <div class="bg-dark-950 p-3.5 rounded-xl border border-dark-700 space-y-2.5">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h4 class="font-bold text-white text-xs">${esc(cliente.nombre)}</h4>
-                                <span class="text-[10px] text-slate-400 font-mono">DNI: ${esc(cliente.dni)}</span>
+                    <tr id="loans-client-${esc(key)}" class="hidden bg-dark-900/70">
+                        <td colspan="6" class="p-3">
+                            <div class="text-xs text-cyan-400 font-bold mb-2"><i class="fa-solid fa-folder-open mr-1"></i> PRÉSTAMOS DE ${esc(cliente.nombre || 'CLIENTE').toUpperCase()}</div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                    <thead class="text-slate-400 bg-dark-700/60 font-mono"><tr><th class="p-3">Préstamo</th><th class="p-3">Frecuencia</th><th class="p-3">Deuda</th><th class="p-3">Cuotas</th><th class="p-3">Saldo</th><th class="p-3 text-right">Acción</th></tr></thead>
+                                    <tbody>${filasPrestamos}</tbody>
+                                </table>
                             </div>
-                            <span class="bg-dark-700 px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">${l.frecuencia}</span>
+                        </td>
+                    </tr>`;
+
+                // Móvil: una tarjeta por cliente con sus préstamos plegables.
+                const tarjetasPrestamos = prestamos.map(l => {
+                    const cuotas = l.cuotas || [];
+                    const pagadas = cuotas.filter(c => c.estado === 'PAGADO').length;
+                    const saldo = cuotas.filter(c => c.estado !== 'PAGADO')
+                        .reduce((sum, c) => sum + Number(c.monto || 0), 0);
+                    return `
+                        <div class="bg-dark-900 p-3 rounded-xl border border-dark-700 space-y-2">
+                            <div class="flex justify-between items-center"><span class="font-bold text-cyan-400 text-xs">${esc(l.id)}</span><span class="text-[10px] text-slate-400">${esc(l.frecuencia || '-')}</span></div>
+                            <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                <div><span class="text-slate-400 block text-[9px]">Deuda</span><strong class="text-white">S/ ${Number(l.totalPagar || 0).toFixed(2)}</strong></div>
+                                <div><span class="text-slate-400 block text-[9px]">Saldo</span><strong class="text-cyan-400">S/ ${saldo.toFixed(2)}</strong></div>
+                                <div><span class="text-slate-400 block text-[9px]">Cuotas pagadas</span><strong class="text-emerald-400">${pagadas} / ${cuotas.length}</strong></div>
+                                <div><span class="text-slate-400 block text-[9px]">Estado</span><strong class="${l.estado === 'PAGADO' ? 'text-emerald-400' : 'text-amber-400'}">${esc(l.estado || '-')}</strong></div>
+                            </div>
+                            <button onclick="openScheduleModal('${esc(l.id)}')" class="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold rounded-lg text-xs shadow-neon-cyan"><i class="fa-solid fa-list-check mr-1"></i> Ver Cuotas</button>
+                        </div>`;
+                }).join('');
+
+                mobList.innerHTML += `
+                    <div class="bg-dark-950 p-3.5 rounded-xl border border-dark-700 space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div><h4 class="font-bold text-white text-xs">${esc(cliente.nombre || 'Sin nombre')}</h4><span class="text-[10px] text-slate-400 font-mono">DNI: ${esc(cliente.dni || '-')}</span><span class="block text-[10px] text-slate-500">${esc(cliente.telefono||'Sin teléfono')} · ${esc(cliente.direccion||'Sin dirección')}</span></div>
+                            <span class="bg-dark-700 px-2 py-0.5 rounded text-[10px] text-cyan-400 font-mono">${prestamos.length} préstamo(s)</span>
                         </div>
                         <div class="grid grid-cols-2 gap-2 text-[11px] font-mono bg-dark-900 p-2 rounded-lg border border-dark-800">
-                            <div>
-                                <span class="text-slate-400 text-[9px] block">Deuda Total</span>
-                                <strong class="text-white">S/ ${l.totalPagar.toFixed(2)}</strong>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 text-[9px] block">Saldo Restante</span>
-                                <strong class="text-cyan-400">S/ ${saldoRestante.toFixed(2)}</strong>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 text-[9px] block">Progreso Cuotas</span>
-                                <strong class="text-emerald-400">${pagadasCount} / ${l.cuotasCount}</strong>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 text-[9px] block">Estado</span>
-                                <strong class="${l.estado === 'PAGADO' ? 'text-emerald-400' : 'text-amber-400'}">${l.estado}</strong>
-                            </div>
+                            <div><span class="text-slate-400 text-[9px] block">Deuda total</span><strong class="text-white">S/ ${totalDeuda.toFixed(2)}</strong></div>
+                            <div><span class="text-slate-400 text-[9px] block">Saldo restante</span><strong class="text-cyan-400">S/ ${saldoRestante.toFixed(2)}</strong></div>
+                            <div><span class="text-slate-400 text-[9px] block">Cuotas pagadas</span><strong class="text-emerald-400">${cuotasPagadas} / ${totalCuotas}</strong></div>
+                            <div><span class="text-slate-400 text-[9px] block">Estado</span><strong class="${estadoCliente === 'PAGADO' ? 'text-emerald-400' : 'text-amber-400'}">${estadoCliente}</strong></div>
                         </div>
-                        <button onclick="openScheduleModal('${l.id}')" class="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold rounded-lg text-xs shadow-neon-cyan flex items-center justify-center">
-                            <i class="fa-solid fa-list-check mr-1"></i> Ver Cuotas de Cliente
-                        </button>
-                    </div>
-                `;
+                        <button onclick="toggleClientLoansMobile('${esc(key)}')" class="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold rounded-lg text-xs shadow-neon-cyan"><i class="fa-solid fa-chevron-down mr-1"></i> Mostrar préstamos</button>
+                        <div class="grid grid-cols-3 gap-2"><button onclick="openClientProfile('${esc(key)}')" class="py-2 bg-dark-700 text-cyan-300 rounded-lg text-[11px]">Ver perfil</button><button onclick="editClient('${esc(key)}')" class="py-2 bg-dark-700 text-amber-300 rounded-lg text-[11px]">Editar</button><button onclick="newLoanForClient('${esc(key)}')" class="py-2 bg-dark-700 text-emerald-300 rounded-lg text-[11px]">Nuevo préstamo</button></div><div id="mobile-loans-client-${esc(key)}" class="hidden space-y-2">${tarjetasPrestamos}</div>
+                    </div>`;
             });
+        }
+
+        function toggleClientLoans(clientId) {
+            const row = document.getElementById(`loans-client-${clientId}`);
+            if (row) row.classList.toggle('hidden');
+        }
+
+        function toggleClientLoansMobile(clientId) {
+            const panel = document.getElementById(`mobile-loans-client-${clientId}`);
+            if (panel) panel.classList.toggle('hidden');
         }
 
         // Render Inside Schedule Modal (With Mobile Cards)
@@ -1415,9 +1553,7 @@
                         <td class="p-2.5 text-slate-300 font-bold">${esc(c.metodoPago || '-')} ${c.numOperacion ? `<span class="text-[10px] font-mono text-slate-400">(${esc(c.numOperacion)})</span>` : ''}</td>
                         <td class="p-2.5 text-right no-print">
                             ${isPaid ? `
-                                <button onclick="printReceiptForInstallment('${loan.id}', ${c.numero})" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-dark-700">
-                                    <i class="fa-solid fa-receipt mr-1"></i> Recibo
-                                </button>
+                                <button onclick="printReceiptForInstallment('${loan.id}', ${c.numero})" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-dark-700">Recibo</button><button onclick="adjustMora('${loan.id}',${c.numero},${Number(c.mora||0)})" class="text-[10px] text-cyan-300 px-2 py-1 rounded bg-dark-700">Corregir mora</button>
                             ` : `
                                 <button onclick="openPaymentConfirmModal('${loan.id}', ${c.numero})" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded text-xs transition shadow-neon-emerald">
                                     <i class="fa-solid fa-check mr-1"></i> Cobrar
@@ -1441,9 +1577,7 @@
                         </div>
                         <div>
                             ${isPaid ? `
-                                <button onclick="printReceiptForInstallment('${loan.id}', ${c.numero})" class="text-[11px] text-slate-300 px-2.5 py-1.5 rounded-lg bg-dark-700 border border-dark-600">
-                                    <i class="fa-solid fa-receipt mr-1"></i> Recibo
-                                </button>
+                                <div class="flex flex-col gap-1"><button onclick="printReceiptForInstallment('${loan.id}', ${c.numero})" class="text-[11px] text-slate-300 px-2.5 py-1.5 rounded-lg bg-dark-700 border border-dark-600">Recibo</button><button onclick="adjustMora('${loan.id}',${c.numero},${Number(c.mora||0)})" class="text-[10px] text-cyan-300 px-2 py-1 rounded bg-dark-700">Corregir mora</button></div>
                             ` : `
                                 <button onclick="openPaymentConfirmModal('${loan.id}', ${c.numero})" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-xs shadow-neon-emerald">
                                     <i class="fa-solid fa-check mr-1"></i> Cobrar
@@ -1650,43 +1784,18 @@
                 });
             }
 
-            // Populate Mora Schedule
+            // Mora agrupada por cliente: cada persona aparece una sola vez.
             if (moraList.length === 0) {
                 moraTbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">¡Excelente! Ningún cliente se encuentra en mora.</td></tr>`;
                 mobMoraList.innerHTML = `<div class="p-3 text-center text-slate-500 text-xs bg-dark-900 rounded-xl border border-dark-700">¡Excelente! Ningún cliente se encuentra en mora.</div>`;
             } else {
-                moraList.forEach(item => {
-                    const c = item.cuota;
-                    // Desktop
-                    moraTbody.innerHTML += `
-                        <tr class="hover:bg-rose-950/20">
-                            <td class="p-3">
-                                <div class="font-bold text-white">${esc(item.clienteNombre)}</div>
-                                <div class="text-[10px] text-slate-400 font-mono">DNI: ${esc(item.clienteDni)}</div>
-                            </td>
-                            <td class="p-3 font-mono font-bold">Cuota #${c.numero}</td>
-                            <td class="p-3 font-mono text-rose-400 font-bold">${c.fechaProgramada}</td>
-                            <td class="p-3 font-mono"><span class="bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded text-[10px] font-bold">${item.diasAtraso} días atraso</span></td>
-                            <td class="p-3 font-mono font-bold text-rose-400">S/ ${montoTotalCuota(c).toFixed(2)}${moraTag(c)}</td>
-                            <td class="p-3 text-center">
-                                <button onclick="openPaymentConfirmModal('${item.loanId}', ${c.numero})" class="px-3 py-1 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded text-xs transition">
-                                    <i class="fa-solid fa-hand-holding-dollar mr-1"></i> Cobrar Mora
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                    // Mobile Card
-                    mobMoraList.innerHTML += `
-                        <div class="bg-rose-950/30 p-3 rounded-xl border border-rose-900/40 flex justify-between items-center text-xs">
-                            <div>
-                                <h4 class="font-bold text-white">${esc(item.clienteNombre)}</h4>
-                                <div class="text-[10px] text-rose-400 font-mono">Cuota #${c.numero} (${item.diasAtraso}d atraso) — <strong>S/ ${montoTotalCuota(c).toFixed(2)}</strong> <span class="text-rose-300">(${c.monto.toFixed(2)} + ${MORA_FEE.toFixed(2)} mora)</span></div>
-                            </div>
-                            <button onclick="openPaymentConfirmModal('${item.loanId}', ${c.numero})" class="px-3 py-1.5 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-lg text-xs">
-                                <i class="fa-solid fa-hand-holding-dollar mr-1"></i> Cobrar
-                            </button>
-                        </div>
-                    `;
+                const gruposMora = new Map();
+                moraList.forEach(item => { const loan=loans.find(l=>l.id===item.loanId); const cliente=loan&&clients.find(c=>String(c.id)===String(loan.clienteId)); const key=cliente?String(cliente.id):item.clienteNombre; if(!gruposMora.has(key)) gruposMora.set(key,{nombre:item.clienteNombre,dni:item.clienteDni,items:[]}); gruposMora.get(key).items.push(item); });
+                gruposMora.forEach(g => {
+                    const total=g.items.reduce((a,x)=>a+montoTotalCuota(x.cuota),0);
+                    const rows=g.items.map(item=>{const c=item.cuota;return `<tr class="border-t border-dark-700/70"><td class="p-2">Cuota #${c.numero}</td><td class="p-2">${esc(c.fechaProgramada)}</td><td class="p-2">${item.diasAtraso} días</td><td class="p-2 font-bold text-rose-300">S/ ${montoTotalCuota(c).toFixed(2)}</td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="openPaymentConfirmModal('${item.loanId}',${c.numero})" class="px-2 py-1 bg-rose-500 text-white rounded text-[10px]">Cobrar</button><button onclick="toggleMora('${item.loanId}',${c.numero},${c.moraOmitida?'false':'true'})" class="px-2 py-1 bg-dark-700 text-amber-300 rounded text-[10px]">${c.moraOmitida?'Restaurar':'Omitir S/ 10'}</button></div></td></tr>`;}).join('');
+                    moraTbody.innerHTML += `<tr class="bg-rose-950/30 border-y border-rose-900/40"><td colspan="6" class="p-3"><details><summary class="cursor-pointer flex flex-wrap justify-between gap-2"><span><strong class="text-white">${esc(g.nombre)}</strong><span class="text-slate-400 text-[10px] ml-2">DNI: ${esc(g.dni)}</span></span><span class="text-rose-300 font-bold">${g.items.length} cuota(s) · S/ ${total.toFixed(2)}</span></summary><div class="overflow-x-auto mt-3"><table class="w-full text-left text-xs"><thead class="text-slate-400"><tr><th class="p-2">Cuota</th><th class="p-2">Vencimiento</th><th class="p-2">Atraso</th><th class="p-2">Total</th><th class="p-2">Acciones</th></tr></thead><tbody>${rows}</tbody></table></div></details></td></tr>`;
+                    mobMoraList.innerHTML += `<details class="bg-rose-950/30 p-3 rounded-xl border border-rose-900/40"><summary class="cursor-pointer flex justify-between gap-2 text-xs"><strong class="text-white">${esc(g.nombre)}</strong><span class="text-rose-300">${g.items.length} cuota(s) · S/ ${total.toFixed(2)}</span></summary><div class="space-y-2 mt-3">${g.items.map(item=>{const c=item.cuota;return `<div class="bg-dark-900 p-2 rounded-lg text-xs"><div class="flex justify-between"><b>Cuota #${c.numero}</b><span class="text-rose-300">${item.diasAtraso} días</span></div><div class="text-slate-300 my-1">${esc(c.fechaProgramada)} · S/ ${montoTotalCuota(c).toFixed(2)}</div><div class="flex gap-2"><button onclick="openPaymentConfirmModal('${item.loanId}',${c.numero})" class="px-2 py-1 bg-rose-500 text-white rounded">Cobrar</button><button onclick="toggleMora('${item.loanId}',${c.numero},${c.moraOmitida?'false':'true'})" class="px-2 py-1 bg-dark-700 text-amber-300 rounded">${c.moraOmitida?'Restaurar':'Omitir mora'}</button></div></div>`;}).join('')}</div></details>`;
                 });
             }
         }
@@ -1695,6 +1804,7 @@
         function renderDashboard() {
             let totalCapital = 0;
             let totalCobrado = 0;
+            let totalBasePagado = 0;
             let totalDeuda = 0;
             let pagadasCount = 0;
             let pendientesCount = 0;
@@ -1710,14 +1820,15 @@
 
                 l.cuotas.forEach(c => {
                     if (c.estado === 'PAGADO') {
-                        totalCobrado += c.monto;
+                        totalCobrado += Number(c.montoCobrado ?? (Number(c.monto) + Number(c.mora || 0)));
+                        totalBasePagado += Number(c.monto || 0);
                         pagadasCount++;
                         if (c.mora) { moraGanada += c.mora; moraCount++; if (c.fechaPago === todayStr) moraHoy += c.mora; }
                     } else {
                         if (c.fechaProgramada < todayStr) {
                             vencidasCount++;
                             moraMontoTotal += c.monto;
-                            moraPorCobrar += MORA_FEE;
+                            if (!c.moraOmitida) moraPorCobrar += MORA_FEE;
                         } else {
                             pendientesCount++;
                         }
@@ -1725,7 +1836,7 @@
                 });
             });
 
-            const saldoPendiente = totalDeuda - totalCobrado;
+            const saldoPendiente = Math.max(0, totalDeuda - totalBasePagado);
 
             document.getElementById('dash-capital').innerText = `S/ ${totalCapital.toFixed(2)}`;
             document.getElementById('dash-cobrado').innerText = `S/ ${totalCobrado.toFixed(2)}`;
@@ -1759,16 +1870,253 @@
                 const cliente = clients.find(c => c.id === l.clienteId) || { nombre: 'Desconocido', dni: '-' };
                 l.cuotas.forEach(c => {
                     if (c.estado === 'PAGADO' && c.fechaPago >= fromDate && c.fechaPago <= toDate) {
-                        const mora = c.mora || 0;
-                        data.push([c.fechaPago, c.horaPago || '-', cliente.nombre, cliente.dni, l.id, c.numero, c.monto.toFixed(2), mora.toFixed(2), round2(c.monto + mora).toFixed(2), c.metodoPago || 'Efectivo', c.numOperacion || '-', c.auditId || '-']);
+                        const mora = Number(c.mora || 0);
+                        const recibido = Number(c.montoCobrado ?? (Number(c.monto) + mora));
+                        const ajuste = round2(recibido - Number(c.monto) - mora);
+                        data.push([c.fechaPago, c.horaPago || '-', cliente.nombre, cliente.dni, l.id, c.numero,
+                            Number(c.monto || 0), mora, recibido, ajuste, c.metodoPago || 'Efectivo', c.numOperacion || '-', c.auditId || '-']);
                     }
                 });
             });
-            if (data.length === 0) return alert('No se encontraron registros de cobros en el rango de fechas seleccionado.');
+
+            const movimientosRango = (cashMovements || []).filter(x => x.fecha >= fromDate && x.fecha <= toDate);
+            const loanRange = loans.filter(l => l.fechaInicio >= fromDate && l.fechaInicio <= toDate);
+            const adjRange = (moraAdjustments || []).filter(x => String(x.creado_en || '').slice(0, 10) >= fromDate && String(x.creado_en || '').slice(0, 10) <= toDate);
+            if (data.length === 0 && movimientosRango.length === 0 && loanRange.length === 0 && adjRange.length === 0) {
+                return alert('No se encontraron movimientos en el rango seleccionado.');
+            }
             data.sort((a, b) => (a[0] + a[1]).localeCompare(b[0] + b[1]));
-            const sum = i => data.reduce((acc, r) => acc + Math.round(parseFloat(r[i]) * 100), 0) / 100;
-            const rows = [['FECHA PAGO', 'HORA PAGO', 'CLIENTE', 'DNI', 'ID PRESTAMO', 'CUOTA N°', 'MONTO CUOTA (S/)', 'MORA (S/)', 'TOTAL COBRADO (S/)', 'METODO PAGO', 'N° OPERACION', 'AUDIT TRX ID'], ...data, ['', '', '', '', '', 'TOTALES', sum(6).toFixed(2), sum(7).toFixed(2), sum(8).toFixed(2), '', '', '']];
-            downloadBlob('\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8;', `Reporte_Ingresos_Credicochas_${fromDate}_al_${toDate}.csv`);
+
+            const sum = (rows, index) => round2(rows.reduce((acc, row) => acc + Number(row[index] || 0), 0));
+            const cobrosReales = sum(data, 8);
+            const otrosIngresos = round2(movimientosRango.filter(x => x.tipo === 'INGRESO').reduce((a, x) => a + Number(x.monto || 0), 0));
+            const capitalDesembolsado = round2(loanRange.reduce((a, l) => a + Number(l.capital || 0), 0));
+            const egresosCaja = round2(movimientosRango.filter(x => x.tipo === 'EGRESO').reduce((a, x) => a + Number(x.monto || 0), 0));
+            const totalIngresos = round2(cobrosReales + otrosIngresos);
+            const totalSalidas = round2(capitalDesembolsado + egresosCaja);
+            const flujoNeto = round2(totalIngresos - totalSalidas);
+            const moneyFmt = '"S/ "#,##0.00;[Red]-"S/ "#,##0.00';
+            const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 }, fill: { fgColor: { rgb: '123047' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: { bottom: { style: 'medium', color: { rgb: '16A6A1' } } } };
+            const titleStyle = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 16 }, fill: { fgColor: { rgb: '102A43' } }, alignment: { vertical: 'center' } };
+            const subtitleStyle = { font: { italic: true, color: { rgb: '526579' }, sz: 10 }, fill: { fgColor: { rgb: 'EAF1F6' } }, alignment: { vertical: 'center' } };
+            const totalStyle = { font: { bold: true, color: { rgb: '102A43' } }, fill: { fgColor: { rgb: 'DCEFEB' } }, border: { top: { style: 'medium', color: { rgb: '16A6A1' } } } };
+            const bodyBorder = { bottom: { style: 'hair', color: { rgb: 'DCE4EA' } } };
+
+            function colLetter(n) {
+                let out = '';
+                while (n >= 0) { out = String.fromCharCode((n % 26) + 65) + out; n = Math.floor(n / 26) - 1; }
+                return out;
+            }
+            function makeDetailSheet(title, headers, rows, widths, moneyColumns = [], totalValues = null) {
+                const aoa = [[title], [`Grupo Stellar | Credicochas · Periodo: ${fromDate} al ${toDate}`], [], headers, ...rows];
+                if (totalValues) aoa.push(totalValues);
+                const ws = XLSX.utils.aoa_to_sheet(aoa);
+                const lastCol = headers.length - 1;
+                ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }];
+                ws['!cols'] = widths.map(wch => ({ wch }));
+                ws['!rows'] = [{ hpt: 30 }, { hpt: 21 }, { hpt: 8 }, { hpt: 32 }];
+                ws['!freeze'] = { xSplit: 0, ySplit: 4 };
+                const lastRow = aoa.length;
+                ws['!autofilter'] = { ref: `A4:${colLetter(lastCol)}${Math.max(4, rows.length + 4)}` };
+                for (let c = 0; c <= lastCol; c++) {
+                    const titleCell = ws[`${colLetter(c)}1`]; if (titleCell) titleCell.s = titleStyle;
+                    const subCell = ws[`${colLetter(c)}2`]; if (subCell) subCell.s = subtitleStyle;
+                    const headCell = ws[`${colLetter(c)}4`]; if (headCell) headCell.s = headerStyle;
+                }
+                for (let r = 4; r < 4 + rows.length; r++) {
+                    for (let c = 0; c <= lastCol; c++) {
+                        const ref = `${colLetter(c)}${r + 1}`;
+                        if (!ws[ref]) continue;
+                        ws[ref].s = { font: { color: { rgb: '243746' }, sz: 10 }, fill: { fgColor: { rgb: r % 2 === 0 ? 'F4F8FB' : 'FFFFFF' } }, border: bodyBorder, alignment: { vertical: 'center' } };
+                    }
+                }
+                moneyColumns.forEach(c => {
+                    for (let r = 4; r < 4 + rows.length; r++) {
+                        const ref = `${colLetter(c)}${r + 1}`;
+                        if (ws[ref]) { ws[ref].z = moneyFmt; ws[ref].s = { ...(ws[ref].s || {}), alignment: { horizontal: 'right', vertical: 'center' } }; }
+                    }
+                });
+                if (totalValues) {
+                    const r = 4 + rows.length;
+                    for (let c = 0; c <= lastCol; c++) {
+                        const ref = `${colLetter(c)}${r + 1}`;
+                        if (ws[ref]) ws[ref].s = totalStyle;
+                    }
+                    moneyColumns.forEach(c => { const ref = `${colLetter(c)}${r + 1}`; if (ws[ref]) ws[ref].z = moneyFmt; });
+                }
+                return ws;
+            }
+
+            if (window.XLSX) {
+                const wb = XLSX.utils.book_new();
+                wb.Props = { Title: 'Reporte financiero Credicochas', Subject: `Periodo ${fromDate} al ${toDate}`, Author: 'Credicochas', Company: 'Grupo Stellar' };
+
+                const summaryRows = [
+                    ['Cobros reales de cuotas', cobrosReales],
+                    ['Otros ingresos registrados', otrosIngresos],
+                    ['TOTAL DE INGRESOS', totalIngresos],
+                    ['Capital entregado en préstamos', capitalDesembolsado],
+                    ['Egresos y retiros de caja', egresosCaja],
+                    ['TOTAL DE SALIDAS', totalSalidas],
+                    ['FLUJO NETO DEL PERIODO', flujoNeto],
+                    ['Cuotas cobradas', data.length],
+                    ['Préstamos desembolsados', loanRange.length],
+                    ['Movimientos de caja', movimientosRango.length],
+                    ['Ajustes de mora registrados', adjRange.length]
+                ];
+                const wsSummary = XLSX.utils.aoa_to_sheet([
+                    ['CREDICOCHAS | REPORTE FINANCIERO'],
+                    [`Grupo Stellar · Del ${fromDate} al ${toDate}`],
+                    [], ['INDICADOR', 'RESULTADO'], ...summaryRows,
+                    [], ['NOTA CONTABLE', 'Los ajustes de mora se muestran por separado y no modifican el efectivo histórico recibido.']
+                ]);
+                wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } }, { s: { r: 16, c: 1 }, e: { r: 16, c: 1 } }];
+                wsSummary['!cols'] = [{ wch: 39 }, { wch: 25 }];
+                wsSummary['!rows'] = [{ hpt: 32 }, { hpt: 22 }, { hpt: 8 }, { hpt: 25 }];
+                wsSummary['!freeze'] = { xSplit: 0, ySplit: 4 };
+                ['A1','B1'].forEach(ref => { if (wsSummary[ref]) wsSummary[ref].s = titleStyle; });
+                ['A2','B2'].forEach(ref => { if (wsSummary[ref]) wsSummary[ref].s = subtitleStyle; });
+                ['A4','B4'].forEach(ref => { if (wsSummary[ref]) wsSummary[ref].s = headerStyle; });
+                for (let r = 4; r < 15; r++) {
+                    ['A','B'].forEach(col => { const ref = `${col}${r+1}`; if (wsSummary[ref]) wsSummary[ref].s = { font: { color: { rgb: '243746' }, sz: 10, bold: [6,9,10].includes(r) }, fill: { fgColor: { rgb: r % 2 === 0 ? 'F4F8FB' : 'FFFFFF' } }, border: bodyBorder }; });
+                    const valueRef = `B${r+1}`;
+                    if (wsSummary[valueRef] && r < 11) wsSummary[valueRef].z = moneyFmt;
+                }
+                ['A7','B7','A10','B10','A11','B11'].forEach(ref => { if (wsSummary[ref]) wsSummary[ref].s = totalStyle; });
+                if (wsSummary['A17']) wsSummary['A17'].s = { font: { bold: true, color: { rgb: '123047' } }, fill: { fgColor: { rgb: 'FFF4D6' } } };
+                if (wsSummary['B17']) wsSummary['B17'].s = { font: { color: { rgb: '66501B' }, italic: true }, fill: { fgColor: { rgb: 'FFF4D6' } }, alignment: { wrapText: true } };
+                XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
+
+                const payHeaders = ['FECHA','HORA','CLIENTE','DNI','ID PRÉSTAMO','N° CUOTA','MONTO CUOTA','MORA VIGENTE','TOTAL RECIBIDO','AJUSTE CONTABLE','MÉTODO DE PAGO','N° OPERACIÓN','ID AUDITORÍA'];
+                const payRows = data;
+                const payTotal = ['','','','','TOTALES','',sum(data,6),sum(data,7),sum(data,8),sum(data,9),'','',''];
+                XLSX.utils.book_append_sheet(wb, makeDetailSheet('COBROS DE CUOTAS', payHeaders, payRows,
+                    [14,11,30,14,17,11,17,17,19,18,18,20,22], [6,7,8,9], payTotal), 'Cobros');
+
+                const cashHeaders = ['FECHA','TIPO','CATEGORÍA','DESCRIPCIÓN','MONTO','USUARIO','ID MOVIMIENTO'];
+                const cashRows = movimientosRango.map(x => [x.fecha, x.tipo, x.categoria || '-', x.descripcion || '-', Number(x.monto || 0), x.usuario || '-', x.id]);
+                const cashTotal = ['','', '', 'TOTAL INGRESOS', otrosIngresos, '', ''];
+                XLSX.utils.book_append_sheet(wb, makeDetailSheet('MOVIMIENTOS DE CAJA', cashHeaders, cashRows,
+                    [14,14,22,42,18,20,17], [4], cashTotal), 'Caja');
+
+                const loanHeaders = ['FECHA DE DESEMBOLSO','CLIENTE','DNI','ID PRÉSTAMO','CAPITAL ENTREGADO','TOTAL PACTADO','FRECUENCIA','ESTADO'];
+                const loanRows = loanRange.map(l => { const c = clients.find(x => x.id === l.clienteId) || {}; return [l.fechaInicio, c.nombre || '-', c.dni || '-', l.id, Number(l.capital || 0), Number(l.totalPagar || 0), l.frecuencia || '-', l.estado || '-']; });
+                const loanTotal = ['', '', '', 'TOTALES', sum(loanRows,4), sum(loanRows,5), '', ''];
+                XLSX.utils.book_append_sheet(wb, makeDetailSheet('PRÉSTAMOS DESEMBOLSADOS', loanHeaders, loanRows,
+                    [21,30,15,17,20,19,16,14], [4,5], loanTotal), 'Desembolsos');
+
+                const adjHeaders = ['FECHA / HORA','CLIENTE','ID PRÉSTAMO','N° CUOTA','MORA ANTERIOR','MORA CORREGIDA','DIFERENCIA','MOTIVO DEL AJUSTE','USUARIO'];
+                const adjRows = adjRange.map(x => [x.creado_en, x.cliente || '-', x.prestamo_id, x.numero, Number(x.mora_anterior || 0), Number(x.mora_nueva || 0), round2(Number(x.mora_nueva || 0) - Number(x.mora_anterior || 0)), x.motivo || '-', x.usuario || '-']);
+                const adjTotal = ['', '', '', 'TOTALES', sum(adjRows,4), sum(adjRows,5), sum(adjRows,6), '', ''];
+                XLSX.utils.book_append_sheet(wb, makeDetailSheet('AJUSTES DE MORA', adjHeaders, adjRows,
+                    [22,30,17,11,18,19,17,40,20], [4,5,6], adjTotal), 'Ajustes de mora');
+
+                XLSX.writeFile(wb, `Credicochas_Reporte_${fromDate}_al_${toDate}.xlsx`, { cellStyles: true });
+                return;
+            }
+
+            const rows = [['FECHA','HORA','TIPO','CLIENTE / DESCRIPCIÓN','DNI / CATEGORÍA','ID PRÉSTAMO','CUOTA N°','MONTO CUOTA (S/)','MORA VIGENTE (S/)','TOTAL REAL RECIBIDO (S/)','AJUSTE CONTABLE (S/)','MÉTODO / USUARIO','OPERACIÓN / AUDITORÍA'],
+                ...data.map(r => [r[0],r[1],'COBRO',r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[12]]),
+                ...movimientosRango.map(x => [x.fecha,'',x.tipo,x.descripcion||'-',x.categoria||'-','-','-',x.tipo==='INGRESO'?Number(x.monto).toFixed(2):'0.00','0.00',x.tipo==='EGRESO'?'-'+Number(x.monto).toFixed(2):Number(x.monto).toFixed(2),'0.00',x.usuario||'-','CAJA-'+x.id]),
+                ...loanRange.map(l => { const c=clients.find(x=>x.id===l.clienteId)||{}; return [l.fechaInicio,'','DESEMBOLSO',c.nombre||'-',c.dni||'-',l.id,'-',(-Number(l.capital||0)).toFixed(2),'0.00',(-Number(l.capital||0)).toFixed(2),'0.00','Sistema','DESEMBOLSO-'+l.id]; })];
+            downloadBlob('\uFEFF' + rows.map(r => r.map(csvCell).join(';')).join('\r\n'), 'text/csv;charset=utf-8;', `Credicochas_Reporte_${fromDate}_al_${toDate}.csv`);
+        }
+
+        function openClientProfile(id) {
+            const c = clients.find(x => String(x.id) === String(id));
+            if (!c) return;
+            const ownLoans = loans.filter(l => String(l.clienteId) === String(id));
+            const allInstallments = ownLoans.flatMap(l => l.cuotas || []);
+            const capital = ownLoans.reduce((s,l) => s + Number(l.capital || 0), 0);
+            const agreed = ownLoans.reduce((s,l) => s + Number(l.totalPagar || 0), 0);
+            const received = allInstallments.filter(q => q.estado === 'PAGADO')
+                .reduce((s,q) => s + Number(q.montoCobrado ?? (Number(q.monto || 0) + Number(q.mora || 0))), 0);
+            const outstanding = allInstallments.filter(q => q.estado !== 'PAGADO')
+                .reduce((s,q) => s + Number(q.monto || 0), 0);
+            const late = allInstallments.filter(q => q.estado !== 'PAGADO' && q.fechaProgramada < hoyISO()).length;
+            const active = ownLoans.filter(l => l.estado === 'ACTIVO').length;
+            const next = allInstallments.filter(q => q.estado !== 'PAGADO').sort((a,b) => a.fechaProgramada.localeCompare(b.fechaProgramada))[0];
+            const kpis = [
+                ['Préstamos', ownLoans.length, 'text-cyan-300'],
+                ['Capital entregado', 'S/ ' + capital.toFixed(2), 'text-white'],
+                ['Total recibido', 'S/ ' + received.toFixed(2), 'text-emerald-300'],
+                ['Saldo pendiente', 'S/ ' + outstanding.toFixed(2), 'text-amber-300']
+            ];
+            document.getElementById('profile-client-name').textContent = c.nombre || 'Sin nombre';
+            document.getElementById('profile-client-meta').textContent = `Código ${c.id} · ${active} préstamo(s) activo(s) · ${late} cuota(s) vencida(s)`;
+            document.getElementById('profile-kpis').innerHTML = kpis.map(([label,value,color]) =>
+                `<div class="rounded-xl bg-dark-800 border border-dark-700 p-3"><div class="text-[10px] text-slate-400">${label}</div><div class="text-base sm:text-lg font-black ${color} mt-1">${esc(String(value))}</div></div>`).join('');
+            const fields = [['DNI / RUC',c.dni],['Teléfono',c.telefono],['Dirección',c.direccion],['Código',c.id]];
+            document.getElementById('profile-client-data').innerHTML = fields.map(([k,v]) =>
+                `<div><dt class="text-[10px] uppercase text-slate-500">${k}</dt><dd class="text-slate-100 font-semibold mt-1 break-words">${esc(v || 'No registrado')}</dd></div>`).join('');
+            document.getElementById('profile-finance-summary').innerHTML = `
+                <div class="flex justify-between gap-3"><span class="text-slate-400">Deuda pactada</span><b class="text-white">S/ ${agreed.toFixed(2)}</b></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-400">Cobrado realmente</span><b class="text-emerald-300">S/ ${received.toFixed(2)}</b></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-400">Saldo de cuotas</span><b class="text-cyan-300">S/ ${outstanding.toFixed(2)}</b></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-400">Cuotas vencidas</span><b class="text-rose-300">${late}</b></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-400">Próximo vencimiento</span><b class="text-white">${next ? esc(next.fechaProgramada) : 'Sin cuotas pendientes'}</b></div>`;
+            document.getElementById('profile-loans-list').innerHTML = ownLoans.length ? ownLoans.map(l => {
+                const qs = l.cuotas || [];
+                const paid = qs.filter(q => q.estado === 'PAGADO').length;
+                const balance = qs.filter(q => q.estado !== 'PAGADO').reduce((s,q)=>s+Number(q.monto||0),0);
+                return `<article class="rounded-xl border border-dark-700 bg-dark-900 p-3">
+                    <div class="flex flex-col sm:flex-row sm:justify-between gap-2">
+                        <div><b class="text-cyan-300">${esc(l.id)}</b><p class="text-[10px] text-slate-500 mt-1">Inicio: ${esc(l.fechaInicio)} · ${esc(l.frecuencia)}</p></div>
+                        <span class="text-[10px] px-2 py-1 rounded-lg self-start ${l.estado==='PAGADO'?'bg-emerald-950 text-emerald-300':'bg-amber-950 text-amber-300'}">${esc(l.estado)}</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs">
+                        <div><span class="block text-slate-500 text-[10px]">Capital</span><b>S/ ${Number(l.capital||0).toFixed(2)}</b></div>
+                        <div><span class="block text-slate-500 text-[10px]">Total pactado</span><b>S/ ${Number(l.totalPagar||0).toFixed(2)}</b></div>
+                        <div><span class="block text-slate-500 text-[10px]">Cuotas pagadas</span><b class="text-emerald-300">${paid}/${qs.length}</b></div>
+                        <div><span class="block text-slate-500 text-[10px]">Saldo cuotas</span><b class="text-cyan-300">S/ ${balance.toFixed(2)}</b></div>
+                    </div>
+                    <button onclick="closeModal('modal-client-profile');openScheduleModal('${esc(l.id)}')" class="mt-3 w-full sm:w-auto px-3 py-2 rounded-lg bg-cyan-500/15 text-cyan-300 text-xs font-bold">Ver cronograma y pagos</button>
+                </article>`;
+            }).join('') : '<p class="text-xs text-slate-500">Este cliente todavía no tiene préstamos.</p>';
+            document.getElementById('profile-new-loan').onclick = () => { closeModal('modal-client-profile'); newLoanForClient(id); };
+            document.getElementById('profile-edit-client').onclick = () => { closeModal('modal-client-profile'); editClient(id); };
+            document.getElementById('modal-client-profile').classList.remove('hidden');
+            document.getElementById('modal-client-profile').classList.add('flex');
+        }
+
+        async function editClient(id) {
+            const c=clients.find(x=>String(x.id)===String(id)); if(!c) return;
+            const nombre=prompt('Nombre completo:',c.nombre); if(nombre===null) return;
+            const dni=prompt('DNI/RUC:',c.dni); if(dni===null) return;
+            const telefono=prompt('Teléfono:',c.telefono||''); if(telefono===null) return;
+            const direccion=prompt('Dirección:',c.direccion||''); if(direccion===null) return;
+            try { const r=await api('update_client',{id:c.id,nombre,dni,telefono,direccion}); Object.assign(c,r.client); populateClientSelect(); renderClientsTable(); renderTodayInstallments(); alert('Datos actualizados.'); } catch(e){alert(e.message);}
+        }
+        function newLoanForClient(id) { switchTab('clientes'); document.getElementById('pres-cliente').value=id; document.getElementById('pres-monto').focus(); document.getElementById('form-prestamo').scrollIntoView({behavior:'smooth',block:'center'}); }
+        async function toggleMora(loanId,numero,omit) { if(!confirm(omit?'¿Omitir los S/ 10 de mora de esta cuota?':'¿Restaurar la mora de esta cuota?')) return; try { await api('omit_mora',{loanId,numero,omit}); await loadAll(); renderTodayInstallments(); renderDashboard(); } catch(e){alert(e.message);} }
+        async function adjustMora(loanId,numero,current) { const v=prompt('Nuevo importe de mora cobrada (S/):',String(current)); if(v===null)return; const amount=Number(v); if(!Number.isFinite(amount)||amount<0)return alert('Importe inválido.'); const motivo=prompt('Motivo de la corrección:','Corrección de mora'); if(motivo===null)return; try { await api('adjust_mora',{loanId,numero,mora:amount,motivo}); await loadAll(); renderTodayInstallments(); renderDashboard(); alert('Corrección registrada.'); } catch(e){alert(e.message);} }
+        function updateCashCategories(){ const t=document.getElementById('cash-type').value, s=document.getElementById('cash-category'); s.innerHTML=t==='INGRESO'?'<option value="APORTE">Aporte</option><option value="OTRO_INGRESO">Otro ingreso</option>':'<option value="GASTO_NEGOCIO">Gasto del negocio</option><option value="RETIRO_PERSONAL">Retiro personal</option>'; }
+        async function handleCashMovement(e){e.preventDefault();const data={tipo:document.getElementById('cash-type').value,categoria:document.getElementById('cash-category').value,monto:Number(document.getElementById('cash-amount').value),fecha:document.getElementById('cash-date').value,descripcion:document.getElementById('cash-description').value};try{await api('cash_movement',data);e.target.reset();document.getElementById('cash-date').value=hoyISO();updateCashCategories();await loadAll();renderCash();alert('Movimiento guardado.');}catch(err){alert(err.message);}}
+        function renderCash() {
+            const rows = cashMovements || [];
+            const paidInstallments = loans.flatMap(l => (l.cuotas || []).filter(c => c.estado === 'PAGADO'));
+            const collected = paidInstallments.reduce((s,c) => s + Number(c.montoCobrado ?? (Number(c.monto) + Number(c.mora || 0))), 0);
+            const disbursed = loans.reduce((s,l) => s + Number(l.capital || 0), 0);
+            const manualIncome = rows.filter(x => x.tipo === 'INGRESO').reduce((s,x) => s + Number(x.monto), 0);
+            const businessExpenses = rows.filter(x => x.tipo === 'EGRESO' && x.categoria === 'GASTO_NEGOCIO').reduce((s,x) => s + Number(x.monto), 0);
+            const personalWithdrawals = rows.filter(x => x.tipo === 'EGRESO' && x.categoria === 'RETIRO_PERSONAL').reduce((s,x) => s + Number(x.monto), 0);
+            const totalIncome = collected + manualIncome;
+            const totalOut = disbursed + businessExpenses + personalWithdrawals;
+            document.getElementById('cash-income').innerText = 'S/ ' + totalIncome.toFixed(2);
+            document.getElementById('cash-expense').innerText = 'S/ ' + totalOut.toFixed(2);
+            document.getElementById('cash-balance').innerText = 'S/ ' + (totalIncome-totalOut).toFixed(2);
+            const breakdown = [
+                ['Cobros recibidos',collected,'text-emerald-300'],
+                ['Otros ingresos',manualIncome,'text-cyan-300'],
+                ['Capital desembolsado',disbursed,'text-amber-300'],
+                ['Gastos del negocio',businessExpenses,'text-rose-300'],
+                ['Retiros personales',personalWithdrawals,'text-orange-300']
+            ];
+            document.getElementById('cash-breakdown').innerHTML = breakdown.map(([label,value,color]) =>
+                `<div class="rounded-xl border border-dark-700 bg-dark-900 p-3"><span class="text-slate-400">${label}</span><b class="block mt-1 ${color}">S/ ${value.toFixed(2)}</b></div>`).join('');
+            document.getElementById('cash-table').innerHTML = rows.map(x =>
+                `<tr class="border-t border-dark-700"><td class="p-2">${esc(x.fecha)}</td><td class="p-2 ${x.tipo==='INGRESO'?'text-emerald-400':'text-rose-400'}">${esc(x.tipo)}</td><td class="p-2">${esc(x.categoria)}</td><td class="p-2">${esc(x.descripcion||'-')}</td><td class="p-2 font-bold">S/ ${Number(x.monto).toFixed(2)}</td></tr>`
+            ).join('') || '<tr><td colspan="5" class="p-3 text-center text-slate-500">Sin movimientos manuales.</td></tr>';
         }
 
         // RENDER AUDIT LOG TABLE
@@ -1799,24 +2147,64 @@
             downloadBlob(JSON.stringify(auditLogs, null, 2), 'application/json', `Credicochas_Audit_Log_${hoyISO()}.json`);
         }
         function exportBackup() {
-            const data = { app: 'credicochas', version: '3.0', exportedAt: new Date().toISOString(), clients, loans, auditLogs };
+            const data = {
+                app: 'credicochas',
+                version: '3.2',
+                exportedAt: new Date().toISOString(),
+                clients,
+                loans,
+                auditLogs,
+                cashMovements,
+                moraAdjustments
+            };
             downloadBlob(JSON.stringify(data, null, 2), 'application/json', `Credicochas_Respaldo_${hoyISO()}.json`);
         }
         function importBackup(ev) {
-            const file = ev.target.files[0]; ev.target.value = '';
+            const file = ev.target.files[0];
+            ev.target.value = '';
             if (!file) return;
+
             const reader = new FileReader();
             reader.onload = async () => {
                 try {
                     const d = JSON.parse(reader.result);
-                    if (d.app !== 'credicochas' || !Array.isArray(d.clients) || !Array.isArray(d.loans) || !Array.isArray(d.auditLogs)) throw new SyntaxError('formato');
-                    if (!confirm(`Se reemplazarán los datos actuales de la BASE DE DATOS por el respaldo (${d.clients.length} clientes, ${d.loans.length} préstamos). ¿Continuar?`)) return;
+
+                    if (d.app !== 'credicochas' ||
+                        !Array.isArray(d.clients) ||
+                        !Array.isArray(d.loans) ||
+                        !Array.isArray(d.auditLogs)) {
+                        throw new SyntaxError('formato');
+                    }
+
+                    const movimientos = Array.isArray(d.cashMovements) ? d.cashMovements.length : 0;
+                    const ajustes = Array.isArray(d.moraAdjustments) ? d.moraAdjustments.length : 0;
+
+                    if (!confirm(
+                        `Se reemplazarán TODOS los datos actuales por el respaldo:\n\n` +
+                        `${d.clients.length} clientes\n${d.loans.length} préstamos\n` +
+                        `${d.auditLogs.length} registros de auditoría\n` +
+                        `${movimientos} movimientos de caja\n${ajustes} ajustes de mora\n\n` +
+                        `Esta operación no se puede deshacer. ¿Continuar?`
+                    )) return;
+
+                    const password = prompt('Ingrese su contraseña actual para autorizar la restauración:');
+                    if (password === null || password === '') {
+                        alert('Restauración cancelada. Se requiere la contraseña.');
+                        return;
+                    }
+
+                    d.password = password;
                     await api('import_backup', d);
                     await loadAll();
-                    renderClientsTable(); renderDashboard(); renderAuditTable(); populateClientSelect();
+                    renderClientsTable();
+                    renderDashboard();
+                    renderAuditTable();
+                    populateClientSelect();
                     alert('Respaldo importado correctamente.');
                 } catch (err) {
-                    alert(err instanceof SyntaxError ? 'El archivo no es un respaldo válido de Credicocha\'s.' : err.message);
+                    alert(err instanceof SyntaxError
+                        ? 'El archivo no es un respaldo válido de Credicocha\'s.'
+                        : err.message);
                 }
             };
             reader.readAsText(file);
@@ -1902,10 +2290,21 @@
         function printReceipt() { printWithMode('receipt'); }
 
         async function systemResetModal() {
-            if (!confirm('Se borrarán TODOS los clientes, préstamos y la auditoría de la BASE DE DATOS. Descargue un respaldo antes. ¿Desea continuar?')) return;
+            if (!confirm('Se borrarán TODOS los clientes, préstamos, cuotas, movimientos de caja, ajustes de mora y auditoría. Descargue un respaldo antes. ¿Desea continuar?')) return;
             if (prompt('Escriba BORRAR para confirmar:') !== 'BORRAR') return;
-            try { await api('reset', { confirm: 'BORRAR' }); location.reload(); }
-            catch (err) { alert(err.message); }
+
+            const password = prompt('Ingrese su contraseña actual para autorizar el reinicio:');
+            if (password === null || password === '') {
+                alert('Reinicio cancelado. Se requiere la contraseña.');
+                return;
+            }
+
+            try {
+                await api('reset', { confirm: 'BORRAR', password });
+                location.reload();
+            } catch (err) {
+                alert(err.message);
+            }
         }
 
     </script>
