@@ -1306,8 +1306,6 @@ try {
         ]);
     }
     $pdo = db();
-    ensure_schema($pdo);
-    ensure_feature_schema($pdo);
 
     switch ($action) {
         case 'session':
