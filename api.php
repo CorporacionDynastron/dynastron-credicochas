@@ -1027,19 +1027,83 @@ function do_update_client(PDO $pdo, array $auth): void
     ]);
 }
 
+
 function do_omit_mora(PDO $pdo, array $auth): void
 {
-    $in=read_json(); $loan=clean_str($in['loanId']??'',20); $n=(int)($in['numero']??0); $omit=!empty($in['omit']);
-    if ($loan==='' || $n<1) throw new ApiError('Cuota inválida.',422);
-    tx($pdo,function() use($pdo,$auth,$loan,$n,$omit) {
-        $st=$pdo->prepare('SELECT c.estado,c.fecha_programada,cl.nombre FROM cuotas c JOIN prestamos p ON p.id=c.prestamo_id JOIN clientes cl ON cl.id=p.cliente_id WHERE c.prestamo_id=? AND c.numero=? FOR UPDATE');
-        $st->execute([$loan,$n]); $c=$st->fetch(); if(!$c) throw new ApiError('Cuota no encontrada.',404);
-        if($c['estado']!=='PENDIENTE') throw new ApiError('Solo puede omitir o restaurar mora de cuotas pendientes.',409);
-        $up=$pdo->prepare('UPDATE cuotas SET mora_omitida=? WHERE prestamo_id=? AND numero=?'); $up->execute([$omit?1:0,$loan,$n]);
-        log_audit($pdo,$omit?'MORA_OMITIDA':'MORA_RESTAURADA',(string)$c['nombre'],(string)$n,0,'-','-',$auth['user']);
+    $in = read_json();
+
+    $loan = clean_str($in['loanId'] ?? '', 20);
+    $n = isset($in['numero']) && is_numeric($in['numero'])
+        ? (int) $in['numero']
+        : 0;
+    $omit = !empty($in['omit']);
+
+    if ($loan === '' || $n < 1) {
+        throw new ApiError('Cuota inválida.', 422);
+    }
+
+    tx($pdo, function () use ($pdo, $auth, $loan, $n, $omit) {
+
+        $st = $pdo->prepare(
+            'SELECT c.estado, c.mora_omitida, cl.nombre
+             FROM cuotas c
+             JOIN prestamos p ON p.id = c.prestamo_id
+             JOIN clientes cl ON cl.id = p.cliente_id
+             WHERE c.prestamo_id = ? AND c.numero = ?
+             FOR UPDATE'
+        );
+
+        $st->execute([$loan, $n]);
+        $c = $st->fetch();
+
+        if (!$c) {
+            throw new ApiError('Cuota no encontrada.', 404);
+        }
+
+        if ($c['estado'] !== 'PENDIENTE') {
+            throw new ApiError(
+                'Solo puede omitir o restaurar mora de cuotas pendientes.',
+                409
+            );
+        }
+
+        $estadoActual = !empty($c['mora_omitida']);
+
+        // Si ya tiene el estado solicitado, no repetir la operación.
+        if ($estadoActual === $omit) {
+            return;
+        }
+
+        $up = $pdo->prepare(
+            'UPDATE cuotas
+             SET mora_omitida = ?
+             WHERE prestamo_id = ? AND numero = ?'
+        );
+
+        $up->execute([
+            $omit ? 1 : 0,
+            $loan,
+            $n
+        ]);
+
+        log_audit(
+            $pdo,
+            $omit ? 'MORA_OMITIDA' : 'MORA_RESTAURADA',
+            (string) $c['nombre'],
+            (string) $n,
+            0,
+            '-',
+            '-',
+            $auth['user']
+        );
     });
-    respond(['ok'=>true,'loan'=>load_loans($pdo,$loan)[0]]);
+
+    respond([
+        'ok' => true,
+        'loan' => load_loans($pdo, $loan)[0]
+    ]);
 }
+
 function do_adjust_mora(PDO $pdo, array $auth): void
 {
     $in=read_json(); $loan=clean_str($in['loanId']??'',20); $n=(int)($in['numero']??0); $new=num($in['mora']??null); $reason=clean_str($in['motivo']??'Corrección de mora',255);
