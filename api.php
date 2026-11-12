@@ -1354,7 +1354,9 @@ $sumaCuotasCentavos = 0;
             $numero = isset($c['numero']) && is_numeric($c['numero']) ? (int) $c['numero'] : 0;
             $fp = clean_str($c['fechaProgramada'] ?? '', 10);
             $monto = num($c['monto'] ?? null);
-            if ($numero < 1 || $numero > 1000 || isset($seen[$numero]) || !valid_date($fp) || $monto === null || $monto <= 0 || $monto >= 1e10) {
+            if ($numero < 1 || $numero > 1000 || isset($seen[$numero])
+    || !in_array($c['estado'] ?? '', ['PENDIENTE', 'PAGADO'], true)
+    || !valid_date($fp) || $monto === null || $monto <= 0 || $monto >= 1e10) {
                 $bad("cuota $numero de $id");
             }
             $seen[$numero] = true;
