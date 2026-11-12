@@ -1305,7 +1305,11 @@ try {
             'serverTime'   => time(),
         ]);
     }
-    $pdo = db();
+       $pdo = db();
+
+    // Inicializar el esquema principal y las extensiones v3.1.
+    ensure_schema($pdo);
+    ensure_feature_schema($pdo);
 
     switch ($action) {
         case 'session':
@@ -1366,7 +1370,9 @@ try {
     }
     if ($sqlstate === '42S02' || $sqlstate === '42P01') {
         try {
-            ensure_schema(db());
+            $pdoRetry = db();
+            ensure_schema($pdoRetry);
+            ensure_feature_schema($pdoRetry);
         } catch (Throwable $ignore) {}
         respond(['ok' => false, 'error' => 'Tablas inicializadas automáticamente. Por favor intente la acción de nuevo.'], 503);
     }
