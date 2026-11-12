@@ -212,13 +212,32 @@ function ensure_schema(PDO $pdo): void
         'auditoria'
     ];
 
-    try {
-        foreach ($tablas as $tabla) {
-            $pdo->query("SELECT 1 FROM {$tabla} LIMIT 1");
-        }
+    if (is_pgsql()) {
+        $st = $pdo->query("
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = current_schema()
+              AND table_type = 'BASE TABLE'
+              AND table_name IN (
+                  'usuarios', 'sesiones', 'login_intentos',
+                  'clientes', 'prestamos', 'cuotas', 'auditoria'
+              )
+        ");
+    } else {
+        $st = $pdo->query("
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = DATABASE()
+              AND table_type = 'BASE TABLE'
+              AND table_name IN (
+                  'usuarios', 'sesiones', 'login_intentos',
+                  'clientes', 'prestamos', 'cuotas', 'auditoria'
+              )
+        ");
+    }
+
+    if ((int) $st->fetchColumn() === count($tablas)) {
         return;
-    } catch (PDOException $e) {
-        // Falta alguna tabla: intentar inicializar el esquema.
     }
 
     $sqlFile = is_pgsql()
@@ -238,7 +257,8 @@ function ensure_schema(PDO $pdo): void
         $tableSql = $parts[0];
 
         foreach (array_filter(array_map('trim', explode(';', $tableSql))) as $stmt) {
-            $clean = trim((string) preg_replace('/^\s*--.*$/m', '', $stmt));
+            $clean = trim((string) preg_replace('/^\\s*--.*$/m', '', $stmt));
+
             if ($clean !== '') {
                 $pdo->exec($clean);
             }
