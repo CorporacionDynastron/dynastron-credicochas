@@ -1343,7 +1343,10 @@ function do_import_backup(PDO $pdo, array $auth): void
             $bad("préstamo $id");
         }
         if (!isset($l['cuotas']) || !is_array($l['cuotas']) || count($l['cuotas']) < 1 || count($l['cuotas']) > 1000) $bad("cuotas de $id");
-        $cuotas = []; $seen = []; $allPaid = true;
+        $cuotas = [];
+$seen = [];
+$allPaid = true;
+$sumaCuotasCentavos = 0;
         foreach ($l['cuotas'] as $c) {
             if (!is_array($c)) $bad("cuotas de $id");
             $numero = isset($c['numero']) && is_numeric($c['numero']) ? (int) $c['numero'] : 0;
@@ -1353,6 +1356,7 @@ function do_import_backup(PDO $pdo, array $auth): void
                 $bad("cuota $numero de $id");
             }
             $seen[$numero] = true;
+            $sumaCuotasCentavos += (int) round($monto * 100);
             $row = ['numero' => $numero, 'fp' => $fp, 'monto' => $monto, 'estado' => 'PENDIENTE', 'fecha_pago' => null, 'hora' => null,
                     'metodo' => null, 'op' => null, 'mora' => null, 'cobrado' => null, 'audit' => null, 'mora_omitida' => !empty($c['moraOmitida']), 'por' => null];
             if (($c['estado'] ?? '') === 'PAGADO') {
@@ -1377,6 +1381,9 @@ function do_import_backup(PDO $pdo, array $auth): void
             }
             $cuotas[] = $row;
         }
+        if ($sumaCuotasCentavos !== (int) round($total * 100)) {
+    $bad("la suma de cuotas no coincide con el total del préstamo $id");
+}
         usort($cuotas, function ($a, $b) { return $a['numero'] <=> $b['numero']; });
         $loans[] = ['id' => $id, 'cid' => $cid, 'capital' => $capital, 'interes' => $interes, 'total' => $total, 'frec' => $frec,
                     'inicio' => $inicio, 'omitir' => array_key_exists('omitirDomingos', $l) ? !empty($l['omitirDomingos']) : true,
