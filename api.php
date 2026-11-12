@@ -453,10 +453,29 @@ function load_loans(PDO $pdo, ?string $onlyId = null): array
         $st->execute([$onlyId]);
         $cuotas = $st->fetchAll();
     }
+
     $ajustes = [];
-    foreach ($pdo->query('SELECT prestamo_id, numero, mora_nueva FROM ajustes_mora ORDER BY id')->fetchAll() as $a) {
+
+    if ($onlyId === null) {
+        $stAjustes = $pdo->query(
+            'SELECT prestamo_id, numero, mora_nueva
+             FROM ajustes_mora
+             ORDER BY id'
+        );
+    } else {
+        $stAjustes = $pdo->prepare(
+            'SELECT prestamo_id, numero, mora_nueva
+             FROM ajustes_mora
+             WHERE prestamo_id = ?
+             ORDER BY id'
+        );
+        $stAjustes->execute([$onlyId]);
+    }
+
+    foreach ($stAjustes->fetchAll() as $a) {
         $ajustes[$a['prestamo_id'] . ':' . $a['numero']] = (float) $a['mora_nueva'];
     }
+
     $byLoan = [];
     foreach ($cuotas as $c) {
         $mapped = map_cuota($c);
