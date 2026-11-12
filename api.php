@@ -1385,6 +1385,11 @@ $sumaCuotasCentavos = 0;
             }
             $cuotas[] = $row;
         }
+        for ($i = 1; $i <= count($cuotas); $i++) {
+    if (!isset($seen[$i])) {
+        $bad("secuencia incompleta de cuotas en el préstamo $id");
+    }
+}
         if ($sumaCuotasCentavos !== (int) round($total * 100)) {
     $bad("la suma de cuotas no coincide con el total del préstamo $id");
 }
