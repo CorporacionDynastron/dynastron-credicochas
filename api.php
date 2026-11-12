@@ -1450,12 +1450,14 @@ function do_import_backup(PDO $pdo, array $auth): void
                             round($monto, 2), $usuario, $creado];
     }
 
-    $cuotasValidas = [];
-    foreach ($loans as $l) {
-        foreach ($l['cuotas'] as $c) {
-            $cuotasValidas[$l['id'] . ':' . $c['numero']] = true;
-        }
+$cuotasValidas = [];
+
+foreach ($loans as $l) {
+    foreach ($l['cuotas'] as $c) {
+        $key = $l['id'] . ':' . $c['numero'];
+        $cuotasValidas[$key] = $c['estado'];
     }
+}
 
     $moraAdjustments = [];
     $moraIds = [];
@@ -1474,7 +1476,8 @@ function do_import_backup(PDO $pdo, array $auth): void
         if (!preg_match('/^[1-9]\d{0,17}$/', $id)
             || isset($moraIds[$id])
             || !isset($loanIds[$prestamo])
-            || $numero < 1 || !isset($cuotasValidas[$prestamo . ':' . $numero])
+           || $numero < 1
+|| ($cuotasValidas[$prestamo . ':' . $numero] ?? null) !== 'PAGADO'
             || $anterior === null || $anterior < 0 || $anterior >= 1e8
             || $nueva === null || $nueva < 0 || $nueva >= 1e8
             || $usuario === ''
