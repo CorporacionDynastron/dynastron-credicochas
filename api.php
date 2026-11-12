@@ -903,24 +903,103 @@ function do_pay(PDO $pdo, array $auth): void
 // ============================================================================
 //  Edición de cliente, mora y caja
 // ============================================================================
+
 function do_update_client(PDO $pdo, array $auth): void
 {
     $in = read_json();
-    $id = clean_str($in['id'] ?? '', 20);
-    $nombre = clean_str($in['nombre'] ?? '', 150);
-    $dni = clean_str($in['dni'] ?? '', 11);
-    $telefono = clean_str($in['telefono'] ?? '', 20);
+
+    $id        = clean_str($in['id'] ?? '', 20);
+    $nombre    = clean_str($in['nombre'] ?? '', 150);
+    $dni       = clean_str($in['dni'] ?? '', 11);
+    $telefono  = clean_str($in['telefono'] ?? '', 20);
     $direccion = clean_str($in['direccion'] ?? '', 255);
-    if ($id === '' || $nombre === '' || !preg_match('/^(\d{8}|\d{11})$/', $dni)) throw new ApiError('Datos de cliente inválidos.', 422);
-    tx($pdo, function () use ($pdo,$id,$nombre,$dni,$telefono,$direccion,$auth) {
-        $st=$pdo->prepare('SELECT id FROM clientes WHERE dni=? AND id<>?'); $st->execute([$dni,$id]);
-        if ($st->fetchColumn()) throw new ApiError('Ya existe otro cliente con ese DNI/RUC.',409);
-        $st=$pdo->prepare('UPDATE clientes SET nombre=?,dni=?,telefono=?,direccion=? WHERE id=?'); $st->execute([$nombre,$dni,$telefono,$direccion,$id]);
-        if (!$st->rowCount()) { $q=$pdo->prepare('SELECT 1 FROM clientes WHERE id=?'); $q->execute([$id]); if (!$q->fetchColumn()) throw new ApiError('Cliente no encontrado.',404); }
-        log_audit($pdo,'CLIENTE_EDITADO',$nombre,'-',0,'-','-',$auth['user']);
+
+    if ($id === '') {
+        throw new ApiError('Seleccione un cliente válido.', 422);
+    }
+
+    if ($nombre === '') {
+        throw new ApiError('Ingrese el nombre del cliente.', 422);
+    }
+
+    if (!preg_match('/^(\d{8}|\d{11})$/', $dni)) {
+        throw new ApiError('El DNI debe tener 8 dígitos (o RUC de 11).', 422);
+    }
+
+    if ($telefono !== '' && !preg_match('/^[\d\s+\-]{6,15}$/', $telefono)) {
+        throw new ApiError('Teléfono inválido.', 422);
+    }
+
+    tx($pdo, function () use (
+        $pdo,
+        $id,
+        $nombre,
+        $dni,
+        $telefono,
+        $direccion,
+        $auth
+    ) {
+        $st = $pdo->prepare(
+            'SELECT id FROM clientes WHERE dni = ? AND id <> ?'
+        );
+        $st->execute([$dni, $id]);
+
+        if ($st->fetchColumn()) {
+            throw new ApiError(
+                'Ya existe otro cliente con ese DNI/RUC.',
+                409
+            );
+        }
+
+        $st = $pdo->prepare(
+            'UPDATE clientes
+             SET nombre = ?, dni = ?, telefono = ?, direccion = ?
+             WHERE id = ?'
+        );
+
+        $st->execute([
+            $nombre,
+            $dni,
+            $telefono,
+            $direccion,
+            $id
+        ]);
+
+        if (!$st->rowCount()) {
+            $q = $pdo->prepare(
+                'SELECT 1 FROM clientes WHERE id = ?'
+            );
+            $q->execute([$id]);
+
+            if (!$q->fetchColumn()) {
+                throw new ApiError('Cliente no encontrado.', 404);
+            }
+        }
+
+        log_audit(
+            $pdo,
+            'CLIENTE_EDITADO',
+            $nombre,
+            '-',
+            0,
+            '-',
+            '-',
+            $auth['user']
+        );
     });
-    respond(['ok'=>true,'client'=>['id'=>$id,'nombre'=>$nombre,'dni'=>$dni,'telefono'=>$telefono,'direccion'=>$direccion]]);
+
+    respond([
+        'ok' => true,
+        'client' => [
+            'id' => $id,
+            'nombre' => $nombre,
+            'dni' => $dni,
+            'telefono' => $telefono,
+            'direccion' => $direccion
+        ]
+    ]);
 }
+
 function do_omit_mora(PDO $pdo, array $auth): void
 {
     $in=read_json(); $loan=clean_str($in['loanId']??'',20); $n=(int)($in['numero']??0); $omit=!empty($in['omit']);
