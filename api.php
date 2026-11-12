@@ -1338,8 +1338,10 @@ function do_import_backup(PDO $pdo, array $auth): void
         $loanIds[$id] = true;
         $capital = num($l['capital'] ?? null); $interes = num($l['interesPct'] ?? null); $total = num($l['totalPagar'] ?? null);
         $frec = clean_str($l['frecuencia'] ?? '', 10); $inicio = clean_str($l['fechaInicio'] ?? '', 10);
-        if ($capital === null || $capital <= 0 || $capital >= 1e10 || $interes === null || $interes < 0 || $interes > 9999
-            || $total === null || $total <= 0 || $total >= 1e10 || !in_array($frec, FRECUENCIAS, true) || !valid_date($inicio)) {
+if ($capital === null || $capital <= 0 || $capital >= 1e10 || $interes === null || $interes < 0 || $interes > 9999
+    || $total === null || $total <= 0 || $total >= 1e10
+    || (int) round($total * 100) !== (int) round(round($capital * (1 + $interes / 100), 2) * 100)
+    || !in_array($frec, FRECUENCIAS, true) || !valid_date($inicio)) {
             $bad("préstamo $id");
         }
         if (!isset($l['cuotas']) || !is_array($l['cuotas']) || count($l['cuotas']) < 1 || count($l['cuotas']) > 1000) $bad("cuotas de $id");
