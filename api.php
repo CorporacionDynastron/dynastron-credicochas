@@ -56,7 +56,7 @@ function send_security_and_cors_headers(): void
 
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? trim((string) $_SERVER['HTTP_ORIGIN']) : '';
     if ($origin !== '') {
-        $allowedConf = trim(env('CORS_ORIGIN', '*'));
+        $allowedConf = trim(env('CORS_ORIGIN', ''));
         $allowOrigin = null;
         if ($allowedConf === '*') {
             $allowOrigin = $origin;
