@@ -1390,11 +1390,7 @@ $sumaCuotasCentavos = 0;
         $bad("secuencia incompleta de cuotas en el préstamo $id");
     }
 }
-for ($i = 1; $i <= count($cuotas); $i++) {
-    if (!isset($seen[$i])) {
-        $bad("secuencia incompleta de cuotas en el préstamo $id");
-    }
-}
+
         usort($cuotas, function ($a, $b) { return $a['numero'] <=> $b['numero']; });
         $loans[] = ['id' => $id, 'cid' => $cid, 'capital' => $capital, 'interes' => $interes, 'total' => $total, 'frec' => $frec,
                     'inicio' => $inicio, 'omitir' => array_key_exists('omitirDomingos', $l) ? !empty($l['omitirDomingos']) : true,
