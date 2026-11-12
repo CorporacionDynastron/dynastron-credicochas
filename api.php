@@ -832,18 +832,26 @@ function do_create_loan(PDO $pdo, array $auth): void
         if ($cliente === false) {
             throw new ApiError('El cliente seleccionado no existe.', 404);
         }
-        $st = $pdo->prepare('SELECT 1 FROM prestamos WHERE id = ?');
-        $loanId = null;
-        for ($i = 0; $i < 30 && $loanId === null; $i++) {
-            $try = 'LOAN-' . random_int(1000, 9999);
-            $st->execute([$try]);
-            if (!$st->fetchColumn()) {
-                $loanId = $try;
-            }
-        }
-        if ($loanId === null) {
-            $loanId = 'LOAN-' . random_int(10000, 99999999);
-        }
+$st = $pdo->prepare('SELECT 1 FROM prestamos WHERE id = ?');
+$loanId = null;
+
+for ($i = 0; $i < 100; $i++) {
+    $try = 'LOAN-' . random_int(100000000, 999999999);
+
+    $st->execute([$try]);
+
+    if (!$st->fetchColumn()) {
+        $loanId = $try;
+        break;
+    }
+}
+
+if ($loanId === null) {
+    throw new ApiError(
+        'No se pudo generar un código único para el préstamo. Intente nuevamente.',
+        503
+    );
+}
         $pdo->prepare(
             'INSERT INTO prestamos (id, cliente_id, capital, interes_pct, total_pagar, cuotas_count, frecuencia, fecha_inicio, omitir_domingos, estado)
              VALUES (?,?,?,?,?,?,?,?,?,?)'
