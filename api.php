@@ -1053,15 +1053,111 @@ function do_adjust_mora(PDO $pdo, array $auth): void
     });
     respond(['ok'=>true,'loan'=>load_loans($pdo,$loan)[0]]);
 }
+
 function do_cash_movement(PDO $pdo, array $auth): void
 {
-    $in=read_json(); $tipo=strtoupper(clean_str($in['tipo']??'',10)); $cat=clean_str($in['categoria']??'',30); $desc=clean_str($in['descripcion']??'',255); $m=num($in['monto']??null); $fecha=clean_str($in['fecha']??today(),10);
-    $cats=['APORTE','OTRO_INGRESO','GASTO_NEGOCIO','RETIRO_PERSONAL'];
-    if(!in_array($tipo,['INGRESO','EGRESO'],true)||!in_array($cat,$cats,true)||$m===null||$m<=0||!valid_date($fecha)) throw new ApiError('Datos del movimiento inválidos.',422);
-    if(($tipo==='INGRESO'&&!in_array($cat,['APORTE','OTRO_INGRESO'],true))||($tipo==='EGRESO'&&!in_array($cat,['GASTO_NEGOCIO','RETIRO_PERSONAL'],true))) throw new ApiError('La categoría no corresponde al tipo de movimiento.',422);
-    if (is_pgsql()) { $st=$pdo->prepare('INSERT INTO movimientos_caja(fecha,tipo,categoria,descripcion,monto,usuario) VALUES(?,?,?,?,?,?) RETURNING id'); $st->execute([$fecha,$tipo,$cat,$desc,round($m,2),$auth['user']]); $id=$st->fetchColumn(); }
-    else { $st=$pdo->prepare('INSERT INTO movimientos_caja(fecha,tipo,categoria,descripcion,monto,usuario) VALUES(?,?,?,?,?,?)'); $st->execute([$fecha,$tipo,$cat,$desc,round($m,2),$auth['user']]); $id=$pdo->lastInsertId(); } respond(['ok'=>true,'movement'=>['id'=>$id,'fecha'=>$fecha,'tipo'=>$tipo,'categoria'=>$cat,'descripcion'=>$desc,'monto'=>round($m,2),'usuario'=>$auth['user']]],201);
+    $in = read_json();
+
+    $tipo = strtoupper(clean_str($in['tipo'] ?? '', 10));
+    $cat = clean_str($in['categoria'] ?? '', 30);
+    $desc = clean_str($in['descripcion'] ?? '', 255);
+    $m = num($in['monto'] ?? null);
+    $fecha = clean_str($in['fecha'] ?? today(), 10);
+
+    $cats = [
+        'APORTE',
+        'OTRO_INGRESO',
+        'GASTO_NEGOCIO',
+        'RETIRO_PERSONAL'
+    ];
+
+    if (
+        !in_array($tipo, ['INGRESO', 'EGRESO'], true)
+        || !in_array($cat, $cats, true)
+        || $m === null
+        || $m <= 0
+        || $m >= 1e10
+        || !valid_date($fecha)
+    ) {
+        throw new ApiError('Datos del movimiento inválidos.', 422);
+    }
+
+    if (
+        ($tipo === 'INGRESO' && !in_array($cat, ['APORTE', 'OTRO_INGRESO'], true))
+        || ($tipo === 'EGRESO' && !in_array($cat, ['GASTO_NEGOCIO', 'RETIRO_PERSONAL'], true))
+    ) {
+        throw new ApiError('La categoría no corresponde al tipo de movimiento.', 422);
+    }
+
+    $monto = round($m, 2);
+    $id = null;
+
+    tx($pdo, function () use ($pdo, $auth, $tipo, $cat, $desc, $monto, $fecha, &$id) {
+
+        if (is_pgsql()) {
+            $st = $pdo->prepare(
+                'INSERT INTO movimientos_caja
+                 (fecha, tipo, categoria, descripcion, monto, usuario)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 RETURNING id'
+            );
+
+            $st->execute([
+                $fecha,
+                $tipo,
+                $cat,
+                $desc,
+                $monto,
+                $auth['user']
+            ]);
+
+            $id = $st->fetchColumn();
+
+        } else {
+            $st = $pdo->prepare(
+                'INSERT INTO movimientos_caja
+                 (fecha, tipo, categoria, descripcion, monto, usuario)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+
+            $st->execute([
+                $fecha,
+                $tipo,
+                $cat,
+                $desc,
+                $monto,
+                $auth['user']
+            ]);
+
+            $id = $pdo->lastInsertId();
+        }
+
+        log_audit(
+            $pdo,
+            $tipo === 'INGRESO' ? 'CAJA_INGRESO' : 'CAJA_EGRESO',
+            '-',
+            '-',
+            $monto,
+            $cat,
+            $desc !== '' ? $desc : '-',
+            $auth['user']
+        );
+    });
+
+    respond([
+        'ok' => true,
+        'movement' => [
+            'id' => $id,
+            'fecha' => $fecha,
+            'tipo' => $tipo,
+            'categoria' => $cat,
+            'descripcion' => $desc,
+            'monto' => $monto,
+            'usuario' => $auth['user']
+        ]
+    ], 201);
 }
+
 
 // ============================================================================
 //  Respaldo / Reinicio (Protegidos con Contraseña Actual)
