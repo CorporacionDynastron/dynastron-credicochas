@@ -290,12 +290,12 @@ function ensure_feature_schema(PDO $pdo): void
             mora_anterior DECIMAL(10,2) NOT NULL, mora_nueva DECIMAL(10,2) NOT NULL, motivo VARCHAR(255) NOT NULL DEFAULT '',
             usuario VARCHAR(50) NOT NULL, creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             KEY idx_ajustes_cuota(prestamo_id,numero), CONSTRAINT fk_ajustes_cuota FOREIGN KEY(prestamo_id,numero) REFERENCES cuotas(prestamo_id,numero) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $pdo->exec("CREATE TABLE IF NOT EXISTS movimientos_caja (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, fecha DATE NOT NULL, tipo VARCHAR(10) NOT NULL,
             categoria VARCHAR(30) NOT NULL, descripcion VARCHAR(255) NOT NULL DEFAULT '', monto DECIMAL(12,2) NOT NULL,
             usuario VARCHAR(50) NOT NULL, creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, KEY idx_caja_fecha(fecha)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 }
 
